@@ -68,10 +68,23 @@ public struct CodeWorkspace: View {
     public var errorText: String?
     /// Flight length in seconds, to bound the trace time slider.
     public var flightDuration: Double
+    /// The simulator's own prediction of the current code, the course it flies, and (during a launch) the real rocket so far.
+    public var report: FlightReport?
+    public var course: Course?
+    public var live: FlightLive?
     @State private var width: CGFloat = 0
 
-    public init(model: CodeWorkspaceModel, errorLine: Int? = nil, errorText: String? = nil, flightDuration: Double = 60) {
+    public init(model: CodeWorkspaceModel, errorLine: Int? = nil, errorText: String? = nil, flightDuration: Double = 60,
+                report: FlightReport? = nil, course: Course? = nil, live: FlightLive? = nil) {
         self.model = model; self.errorLine = errorLine; self.errorText = errorText; self.flightDuration = flightDuration
+        self.report = report; self.course = course; self.live = live
+    }
+
+    @ViewBuilder private func pathView(height: CGFloat) -> some View {
+        if let course {
+            FlightPathView(report: report, course: course, live: live, cursor: $model.traceTime, height: height,
+                           onScrubEnd: { if model.tab == .trace { Task { await model.runTrace() } } })
+        }
     }
 
     public var body: some View {
@@ -128,6 +141,7 @@ public struct CodeWorkspace: View {
                         .padding(.horizontal, 12).padding(.vertical, 7).frame(maxWidth: .infinity, alignment: .leading)
                         .background(Color(red: 0.24, green: 0.04, blue: 0.11).opacity(0.85), in: RoundedRectangle(cornerRadius: 12))
                 }
+                pathView(height: 96)
                 HStack {
                     Button("Load solution") { model.loadSolution() }.buttonStyle(.plain).font(Lab.soft(12)).foregroundStyle(Lab.muted)
                     Spacer()
@@ -145,6 +159,7 @@ public struct CodeWorkspace: View {
     private var python: some View {
         VStack(spacing: 8) {
             PythonEditor(text: Binding(get: { model.source }, set: { if $0 != model.source { model.edit(source: $0) } }), errorLine: errorLine, errorText: errorText)
+            pathView(height: 90)
             if model.handEdited != nil, model.program != nil {
                 HStack { Text("Hand-edited. Blocks are paused.").font(Lab.soft(12)).foregroundStyle(Lab.muted); Spacer(); Button("Back to blocks") { model.backToBlocks() }.buttonStyle(LabPrimaryButton()) }
             }
@@ -153,10 +168,12 @@ public struct CodeWorkspace: View {
 
     private var traceTab: some View {
         VStack(spacing: 10) {
-            HStack(spacing: 10) {
-                Text("TICK AT").font(Lab.label(10)).tracking(1.4).foregroundStyle(Lab.muted)
-                Slider(value: $model.traceTime, in: 0.1...max(1, flightDuration), step: 0.1) { editing in if !editing { Task { await model.runTrace() } } }.tint(Lab.violet)
-                Text(String(format: "%.1f s", model.traceTime)).font(Lab.mono(12)).foregroundStyle(Lab.ink).frame(width: 52, alignment: .trailing)
+            if course != nil { pathView(height: 120) } else {
+                HStack(spacing: 10) {
+                    Text("TICK AT").font(Lab.label(10)).tracking(1.4).foregroundStyle(Lab.muted)
+                    Slider(value: $model.traceTime, in: 0.1...max(1, flightDuration), step: 0.1) { editing in if !editing { Task { await model.runTrace() } } }.tint(Lab.violet)
+                    Text(String(format: "%.1f s", model.traceTime)).font(Lab.mono(12)).foregroundStyle(Lab.ink).frame(width: 52, alignment: .trailing)
+                }
             }
             if model.usesBlocks, let p = model.program, let c = model.composed, model.trace?.compileError == nil {
                 let composer = BlockComposer(program: p, order: .constant(model.order), values: .constant(model.values), errorBlockID: nil, lit: model.lit, readOnly: true)
