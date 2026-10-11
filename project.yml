@@ -50,12 +50,12 @@ targets:
         DEVELOPMENT_TEAM: NWR2UZ4V67
         MARKETING_VERSION: "0.1"
         CURRENT_PROJECT_VERSION: "1"
-        INFOPLIST_KEY_CFBundleDisplayName: "Vision Spacecraft"
+        INFOPLIST_KEY_CFBundleDisplayName: "RocketCraft"
         GENERATE_INFOPLIST_FILE: YES
     info:
       path: Support/Info.plist
       properties:
-        CFBundleDisplayName: Vision Spacecraft
+        CFBundleDisplayName: RocketCraft
         ITSAppUsesNonExemptEncryption: false
         UIAppFonts:
           - Polea-ExtraBold.otf

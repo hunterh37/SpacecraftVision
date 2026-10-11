@@ -291,6 +291,26 @@ final class AppModel {
         syncTaskGuideSnapshot()
     }
 
+    /// Rockets selectable from the lesson launch step; picking one rebuilds the range craft immediately.
+    static let rocketPresets: [(name: String, make: () -> CraftDesign)] = [
+        ("R-hop", { .rHop() }), ("R-gates", { .rGates() }), ("R-walls", { .rWalls() }),
+        ("R-debris", { .rDebris() }), ("A-field", { .aField() }), ("Saturn V", { .saturnV() }),
+    ]
+
+    func selectRocket(named name: String) {
+        guard flight.phase == .idle || flight.phase == .finished,
+              let make = Self.rocketPresets.first(where: { $0.name == name })?.make else { return }
+        assembly.stop()
+        var c = make()
+        if c.name != "Saturn V" {
+            c.payloadMass = mission.payloadMass
+            if let f = mission.fixedFuelLoad { c.setFuelLoad(f) }
+        }
+        craft = c
+        selectedStackPart = nil
+        schedulePreview()
+    }
+
     /// Saturn V Apollo stack (RealityHD stage assets, AS-506 masses).
     func loadSaturnV() {
         assembly.stop()

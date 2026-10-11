@@ -12,7 +12,7 @@ struct SettingsView: View {
         TourActionsReader { a in
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    LabHeader(kicker: "Vision Spacecraft", title: "Settings")
+                    LabHeader(kicker: "RocketCraft", title: "Settings")
                     LabCaption("Launch range sky")
                     HStack {
                         Text("Sky").font(Lab.soft(15))

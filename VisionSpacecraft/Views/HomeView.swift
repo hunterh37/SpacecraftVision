@@ -50,7 +50,7 @@ struct HomeView: View {
         NavigationStack(path: $model.homePath) {
             VStack(spacing: 40) {
                 VStack(spacing: 8) {
-                    Text("VISION SPACECRAFT").font(Brand.display(46)).foregroundStyle(Brand.ink).tracking(4)
+                    Text("ROCKETCRAFT").font(Brand.display(46)).foregroundStyle(Brand.ink).tracking(4)
                     Text("BUILD · CODE · FLY").font(Brand.label(14)).foregroundStyle(Brand.ignition).tracking(6)
                 }
                 HStack(spacing: 24) {

@@ -16,6 +16,8 @@ import Curriculum
 struct RangeImmersiveView: View {
     @Environment(AppModel.self) private var model
     @State private var scene = RangeScene()
+    @State private var builtStatic = false
+    @State private var builtCraft = false
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
 
@@ -51,8 +53,14 @@ struct RangeImmersiveView: View {
             content.add(scene.indicators.world)
             content.add(scene.vignette.root)
             scene.audio.attach(craft: scene.craftHolder, listener: scene.skyHolder)
-            await scene.buildStatic(course: model.mission.course)
-            await scene.rebuildCraft(model.craft)
+            // Head-locked loading panel stays up while the course and craft build in the tasks below.
+            if let loading = attachments.entity(for: "loading") {
+                let head = AnchorEntity(.head)
+                loading.position = [0, 0, -1.2]
+                head.addChild(loading)
+                content.add(head)
+                scene.loadingAnchor = head
+            }
             scene.applyView(model.flightView, course: model.mission.course)
             scene.subscription = content.subscribe(to: SceneEvents.Update.self) { [model, scene] e in
                 model.flight.tick(e.deltaTime)
@@ -62,7 +70,11 @@ struct RangeImmersiveView: View {
             }
             model.loadingSpace = nil
         } update: { _, _ in
+            scene.loadingAnchor?.isEnabled = !(builtStatic && builtCraft)
         } attachments: {
+            Attachment(id: "loading") {
+                if !(builtStatic && builtCraft) { RangeLoadingPanel() }
+            }
             Attachment(id: "hud") {
                 FlightHUDView()
                     .environment(model)
@@ -77,8 +89,16 @@ struct RangeImmersiveView: View {
                     .animation(.easeOut(duration: 0.35), value: model.walkthrough.current?.id)
             }
         }
-        .task(id: model.craft) { await scene.rebuildCraft(model.craft) }
-        .task(id: model.mission.id) { await scene.buildStatic(course: model.mission.course) }
+        .task(id: model.craft) {
+            await scene.rebuildCraft(model.craft)
+            scene.applyView(model.flightView, course: model.mission.course)
+            builtCraft = true
+        }
+        .task(id: model.mission.id) {
+            await scene.buildStatic(course: model.mission.course)
+            scene.applyView(model.flightView, course: model.mission.course)
+            builtStatic = true
+        }
         .task(id: SkyKey(style: model.skyStyle, timeOfDay: model.mission.course.timeOfDay)) {
             scene.updateSky(style: model.skyStyle, timeOfDay: model.mission.course.timeOfDay)
         }
@@ -91,10 +111,11 @@ struct RangeImmersiveView: View {
         .onChange(of: model.flight.phase) { _, p in
             if p == .finished {
                 let r = model.flight.sim?.result
-                scene.audio.cue(r?.passed == true ? "pass" : CrashEffects.destroys(r?.failure?.key) ? "explosion" : "fail")
+                if r?.passed == true { scene.audio.cue("pass") } else if !CrashEffects.destroys(r?.failure?.key) { scene.audio.cue("fail") }
             }
         }
-        .onChange(of: model.flight.gates) { _, n in scene.markGatePassed(n) }
+        .onChange(of: model.flight.gates) { _, n in scene.markGatePassed(n); if n > 0 { scene.audio.cue("gate") } }
+        .onChange(of: model.flight.chuteStage) { _, s in if s > 0 { scene.audio.cue("chute", at: scene.craftHolder) } }
         .onChange(of: model.walkthrough.successCount) { scene.playSuccess() }
         .onAppear {
             if model.learnActive { openWindow(id: WindowID.lesson) } else { model.walkthrough.startIfNeeded() }
@@ -126,6 +147,7 @@ final class RangeScene {
     let root = Entity()           // world root, moved/scaled per view
     let skyHolder = Entity()      // stays around the viewer when the range shifts for chase/tabletop
     let lightHolder = Entity()
+    var loadingAnchor: Entity?
     private let sun = Entity()
     private let fill = Entity()
     let staticHolder = Entity()
@@ -198,19 +220,18 @@ final class RangeScene {
         else if model.learnActive, model.flight.phase != .flying { target = Self.lessonTarget(model.lessonStage); anchor = deck ?? hud }
         else { indicators.hideAll(); return }
         guard let anchor else { indicators.hideAll(); return }
-        let from = anchor.position(relativeTo: nil) + [0, -0.1, 0]
         let s = root.scale.x
         switch target {
         case .pad:
-            indicators.show(beacon: true, haloAt: nil, leader: (from, root.convert(position: [0, 4, 0], to: nil)))
+            indicators.show(beacon: true, haloAt: nil, leader: nil)
         case .ribbon:
             guard let apex = ribbonApex else { indicators.show(beacon: false, haloAt: nil, leader: nil); return }
             let p = root.convert(position: rk(apex) + [0, 0.5, 0], to: nil)
-            indicators.show(beacon: false, haloAt: (p, 6 * s), leader: (from, p))
+            indicators.show(beacon: false, haloAt: (p, 6 * s), leader: nil)
         case .craft:
             let base = root.convert(position: craftHolder.position - [0, Float(craftModel.map { -$0.position.y } ?? 2), 0] + [0, 0.1, 0],
                                     to: nil)
-            indicators.show(beacon: true, haloAt: (base, 2.2 * s), leader: (from, base + [0, 3 * s, 0]))
+            indicators.show(beacon: true, haloAt: (base, 2.2 * s), leader: nil)
         case .hud, nil:
             indicators.show(beacon: false, haloAt: nil, leader: nil)
         }
@@ -240,6 +261,7 @@ final class RangeScene {
                 // viewing platform at (-42, 43) turned 44.3 deg onto the app's viewer line 60 m south of the pad.
                 range.position = [0, -2.15, 0]
                 range.orientation = simd_quatf(angle: atan2(42, 43), axis: [0, 1, 0])
+                Self.removeSunshade(in: range)
                 staticHolder.addChild(range)
             } else {
                 // Desert floor.
@@ -415,6 +437,8 @@ final class RangeScene {
             crashed = true
             let length = Float(max(1, -(craftModel?.position.y ?? -2) * 2))
             crash.trigger(at: rk(f.position), scale: length / 6)
+            audio.cue("explosion", at: crash.root)
+            crash.onImpact = { [audio] d in audio.cue("thud", at: d, gain: -8) }
             craftModel?.isEnabled = false; plume?.isEnabled = false
             drogue?.isEnabled = false; mainChute?.isEnabled = false
             audio.update(throttle: 0, dynamicPressure: 0, propeller: false, chase: view == .chase, flying: false)
@@ -444,12 +468,54 @@ final class RangeScene {
         }
     }
 
+    /// Drops the viewing platform's sunshade (posts above the rail, purlins, canvas): every triangle
+    /// higher than 3.6 m above the platform mesh base.
+    static func removeSunshade(in root: Entity) {
+        var stack = [root]
+        while let e = stack.popLast() {
+            stack.append(contentsOf: e.children)
+            guard e.name == "viewing-platform" else { continue }
+            var models: [ModelEntity] = []
+            var inner = Array(e.children)
+            while let c = inner.popLast() {
+                inner.append(contentsOf: c.children)
+                if let m = c as? ModelEntity { models.append(m) }
+            }
+            for m in models {
+                guard let mesh = m.model?.mesh else { continue }
+                let cut = mesh.bounds.min.y + 3.6
+                var contents = mesh.contents
+                var models = MeshModelCollection()
+                for model in contents.models {
+                    var parts = MeshPartCollection()
+                    for var part in model.parts {
+                        guard let idx = part.triangleIndices else { parts.insert(part); continue }
+                        let pos = part.positions.elements
+                        var kept: [UInt32] = []
+                        let tri = Array(idx.elements)
+                        for t in stride(from: 0, to: tri.count - 2, by: 3) {
+                            let a = tri[t], b = tri[t + 1], c = tri[t + 2]
+                            if pos[Int(a)].y > cut, pos[Int(b)].y > cut, pos[Int(c)].y > cut { continue }
+                            kept += [a, b, c]
+                        }
+                        if kept.isEmpty { continue }
+                        part.triangleIndices = MeshBuffer(kept)
+                        parts.insert(part)
+                    }
+                    models.insert(MeshResource.Model(id: model.id, parts: Array(parts)))
+                }
+                contents.models = models
+                if let new = try? MeshResource.generate(from: contents) { m.model?.mesh = new }
+            }
+        }
+    }
+
     func applyView(_ view: FlightView, course: Course) {
         marker?.isEnabled = view == .tabletop
         switch view {
         case .ground:
             root.scale = .one
-            root.position = [0, -1.6, -60]
+            root.position = [0, -1.1, -60]
             staticHolder.isEnabled = true
             hud?.position = [0, 1.15, -1.1]
         case .chase:
@@ -503,4 +569,16 @@ final class RangeScene {
 
 extension Entity {
     func withPosition(_ p: SIMD3<Float>) -> Entity { position = p; return self }
+}
+
+/// Head-locked progress panel shown in the range until the course and craft finish building.
+struct RangeLoadingPanel: View {
+    var body: some View {
+        VStack(spacing: 14) {
+            ProgressView().controlSize(.extraLarge)
+            Text("Loading launch range").font(.title3.weight(.semibold))
+        }
+        .padding(36)
+        .glassBackgroundEffect()
+    }
 }

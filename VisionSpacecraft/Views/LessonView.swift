@@ -14,6 +14,9 @@ struct LessonView: View {
     @Environment(\.dismissImmersiveSpace) private var dismissSpace
     @State private var card = 0
     @State private var cursor = 3.0
+    @State private var fullCode = false
+    @State private var cutoff = 200.0
+    @State private var throttle = 1.0
 
     private static let stages: [LessonStage] = [.implement, .run, .analyze]
     private static let titles = ["Code", "Launch", "Review"]
@@ -45,14 +48,89 @@ struct LessonView: View {
 
     private var codeStage: some View {
         VStack(alignment: .leading, spacing: 14) {
-            CodeWorkspace(model: model.workspace(for: lesson), errorLine: model.codeProblem?.line, errorText: model.codeProblem?.text,
-                          flightDuration: model.preview?.result.duration ?? 30,
-                          report: model.preview.flatMap { $0.compileError == nil ? $0 : nil }, course: lesson.mission.course, live: nil, chrome: false)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            Picker("Code view", selection: $fullCode) { Text("Simple").tag(false); Text("Full code").tag(true) }
+                .pickerStyle(.segmented).frame(maxWidth: 280)
+            if fullCode { fullWorkspace } else { simpleCode }
             HStack(spacing: 14) {
                 prediction.frame(maxWidth: .infinity, alignment: .leading)
                 Button("Launch") { model.lessonStage = .run }.buttonStyle(BrandButtonStyle())
             }
+        }
+        .onAppear { if !fullCode { pushSimple() } }
+    }
+
+    /// Three-line program with two tunable numbers; every change re-runs the preview and redraws the path.
+    private var simpleCode: some View {
+        HStack(alignment: .top, spacing: 18) {
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 6) {
+                    codeLine("craft.set_throttle(", value: String(format: "%.2f", throttle), tail: ")")
+                    codeLine("if craft.altitude() >= ", value: "\(Int(cutoff))", tail: ":")
+                    codeLine("    craft.set_throttle(0.0)", value: nil, tail: "")
+                }
+                .padding(18).frame(maxWidth: .infinity, alignment: .leading).labCard(corner: 20, tint: Brand.trajectory, aurora: 0.1)
+                knob("Throttle", value: $throttle, range: 0.3...1.0, step: 0.05, text: String(format: "%.2f", throttle))
+                knob("Engine cutoff (m)", value: $cutoff, range: 20...800, step: 10, text: "\(Int(cutoff))")
+                Text("Chutes open on the way down.").font(Brand.label(12)).foregroundStyle(Brand.dim)
+            }
+            .frame(maxWidth: 440)
+            LiveFlightPath(course: lesson.mission.course, cursor: $cursor, height: 300)
+                .padding(16).labCard(corner: 22, tint: Brand.telemetry, aurora: 0.15)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .onChange(of: cutoff) { pushSimple() }
+        .onChange(of: throttle) { pushSimple() }
+    }
+
+    private func codeLine(_ head: String, value: String?, tail: String) -> some View {
+        HStack(spacing: 0) {
+            Text(head).foregroundStyle(Brand.ink)
+            if let value { Text(value).foregroundStyle(Brand.ignition).fontWeight(.bold) }
+            Text(tail).foregroundStyle(Brand.ink)
+        }
+        .font(.system(size: 20, design: .monospaced))
+    }
+
+    private func knob(_ name: String, value: Binding<Double>, range: ClosedRange<Double>, step: Double, text: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack { Text(name).font(Brand.label(12)).foregroundStyle(Brand.dim); Spacer(); Text(text).font(Brand.label(13)).foregroundStyle(Brand.ignition) }
+            Slider(value: value, in: range, step: step).tint(Brand.ignition)
+        }
+    }
+
+    private func pushSimple() {
+        model.workspace(for: lesson).edit(source: Self.simpleSource(cutoff: cutoff, throttle: throttle))
+    }
+
+    static func simpleSource(cutoff: Double, throttle: Double) -> String {
+        """
+        import craft
+
+        CUTOFF_ALT = \(String(format: "%.1f", cutoff))
+        THROTTLE = \(String(format: "%.2f", throttle))
+
+        state = {"chute": False}
+
+        def setup():
+            craft.set_throttle(THROTTLE)
+
+        def update(dt):
+            if craft.altitude() >= CUTOFF_ALT:
+                craft.set_throttle(0.0)
+            if craft.velocity()[2] < 0.0 and not state["chute"]:
+                craft.stage()
+                craft.stage()
+                state["chute"] = True
+            craft.plot("altitude", craft.altitude())
+        """
+    }
+
+    private var fullWorkspace: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            CodeWorkspace(model: model.workspace(for: lesson), errorLine: model.codeProblem?.line, errorText: model.codeProblem?.text,
+                          flightDuration: model.preview?.result.duration ?? 30,
+                          report: model.preview.flatMap { $0.compileError == nil ? $0 : nil }, course: lesson.mission.course, live: nil, chrome: false)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -65,6 +143,7 @@ struct LessonView: View {
                 Text("Goal: \(goalText)").font(.system(size: 14, weight: .medium)).foregroundStyle(Brand.dim)
             }
             .padding(20).labCard(corner: 26, tint: Brand.telemetry, aurora: 0.2)
+            rocketPicker
             prediction
             HStack(spacing: 12) {
                 Button("Launch in range", systemImage: "flame.fill") {
@@ -80,6 +159,29 @@ struct LessonView: View {
             }
             if let r = model.lastReport { ResultCard(report: r) }
             Spacer(minLength: 0)
+        }
+    }
+
+    /// Rocket chooser. Picking one swaps the craft in the range scene at once (RangeScene rebuilds on model.craft).
+    private var rocketPicker: some View {
+        let busy = model.flight.phase == .flying || model.flight.phase == .paused
+        return VStack(alignment: .leading, spacing: 10) {
+            sectionLabel("Rocket", tint: Brand.trajectory)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(AppModel.rocketPresets, id: \.name) { p in
+                        let on = model.craft.name == p.name
+                        Button {
+                            model.selectRocket(named: p.name)
+                            Task { await SpaceSwitcher(model: model, open: openSpace, dismiss: dismissSpace).show(.range) }
+                        } label: {
+                            Label(p.name, systemImage: on ? "checkmark.circle.fill" : "airplane.departure")
+                        }
+                        .buttonStyle(LabSecondaryButtonStyle(tint: on ? Brand.ignition : Brand.telemetry))
+                        .disabled(busy)
+                    }
+                }
+            }
         }
     }
 

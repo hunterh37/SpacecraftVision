@@ -14,6 +14,8 @@ final class AssemblyStage {
     private var homes: [Int: Transform] = [:]
     private var grabOffset: SIMD3<Float>?
     private(set) var snapped = false
+    /// Manual build: bobbing arrow over the next part to grab. Child of that part's rack wrap.
+    private var arrow: Entity?
 
     static let telemetry: UInt32 = 0x4FDBF2
     static let ignition: UInt32 = 0xFF6B21
@@ -32,8 +34,9 @@ final class AssemblyStage {
         radial ? [-3.4, 0.9, -1.4 - Float(k) * 0.8] : [-2.3, 0, -1.2 - Float(k) * 1.1]
     }
 
-    func rebuild(plan: AssemblyPlan?, index: Int, showRack: Bool, craftHolder: Entity) async {
+    func rebuild(plan: AssemblyPlan?, index: Int, showRack: Bool, manual: Bool = false, craftHolder: Entity) async {
         rack.children.removeAll()
+        arrow = nil
         ghost.children.removeAll()
         homes = [:]
         ring = nil
@@ -56,19 +59,29 @@ final class AssemblyStage {
                 plinth.position = wrap.position - [0, 0.45, 0]
                 rack.addChild(plinth)
             }
-            let b = part.visualBounds(relativeTo: wrap)
-            if !b.isEmpty {
-                let ext = simd_max(b.extents, [0.15, 0.15, 0.15])
-                wrap.components.set(CollisionComponent(shapes: [.generateBox(size: ext).offsetBy(translation: b.center)]))
-            }
-            wrap.components.set(InputTargetComponent())
-            wrap.components.set(HoverEffectComponent())
+            // Only the next part in the plan is grabbable; other rack parts get no collision so they
+            // cannot intercept the pinch or overlap the current part's hit box.
             if i == index {
+                let b = part.visualBounds(relativeTo: wrap)
+                if !b.isEmpty {
+                    let ext = simd_max(b.extents, [0.15, 0.15, 0.15])
+                    wrap.components.set(CollisionComponent(shapes: [.generateBox(size: ext).offsetBy(translation: b.center)]))
+                }
+                wrap.components.set(InputTargetComponent())
+                wrap.components.set(HoverEffectComponent())
                 // Grab hint: ring under the part on the rack.
                 let hint = ModelEntity(mesh: .generateCylinder(height: 0.01, radius: 0.45),
                                        materials: [PartMeshFactory.unlit(Self.telemetry, alpha: 0.45)])
                 hint.position = [0, 0.005, 0]
                 wrap.addChild(hint)
+                if manual {
+                    let top = b.isEmpty ? 1 : b.max.y
+                    let a = Self.makeArrow()
+                    a.position = [b.isEmpty ? 0 : b.center.x, top + 0.35, b.isEmpty ? 0 : b.center.z]
+                    wrap.addChild(a)
+                    arrow = a
+                    bob(a)
+                }
             }
             homes[i] = wrap.transform
             rack.addChild(wrap)
@@ -155,6 +168,37 @@ final class AssemblyStage {
 
     // MARK: Manual
 
+    /// Down-pointing arrow: shaft plus cone tip, unlit ignition orange.
+    static func makeArrow() -> Entity {
+        let root = Entity()
+        root.name = "grab-arrow"
+        let mat = PartMeshFactory.unlit(ignition, alpha: 0.95)
+        let shaft = ModelEntity(mesh: .generateCylinder(height: 0.22, radius: 0.035), materials: [mat])
+        shaft.position = [0, 0.2, 0]
+        let tip = ModelEntity(mesh: .generateCone(height: 0.16, radius: 0.09), materials: [mat])
+        tip.position = [0, 0.01, 0]
+        tip.orientation = simd_quatf(angle: .pi, axis: [1, 0, 0])
+        root.addChild(shaft)
+        root.addChild(tip)
+        return root
+    }
+
+    /// 0.12 m bob every 0.6 s while the arrow is in the scene (static with Reduce Motion).
+    private func bob(_ a: Entity) {
+        guard !UIAccessibility.isReduceMotionEnabled else { return }
+        let base = a.transform
+        Task { @MainActor [weak a] in
+            var up = true
+            while let a, a.parent != nil {
+                var t = base
+                t.translation.y += up ? 0.12 : 0
+                a.move(to: t, relativeTo: a.parent, duration: 0.6, timingFunction: .easeInOut)
+                up.toggle()
+                try? await Task.sleep(for: .milliseconds(600))
+            }
+        }
+    }
+
     static func rackIndex(of e: Entity) -> Int? {
         var cur: Entity? = e
         while let c = cur {
@@ -171,6 +215,7 @@ final class AssemblyStage {
     /// Moves a held part toward the hand. Heavy parts trail the hand. Returns snap state for the ring.
     func drag(_ i: Int, hand: SIMD3<Float>, current: Int, target: Transform?, heavy: Bool) -> DragResult {
         guard let e = entity(i) else { return .free }
+        arrow?.isEnabled = false
         let pos = e.position(relativeTo: nil)
         if grabOffset == nil { grabOffset = pos - hand }
         let want = hand + (grabOffset ?? .zero)
@@ -192,6 +237,7 @@ final class AssemblyStage {
 
     func release(_ i: Int) {
         grabOffset = nil
+        arrow?.isEnabled = true
         // Unsnapped parts stay where dropped; rebuild() restores rack homes on the next step.
         _ = i
     }

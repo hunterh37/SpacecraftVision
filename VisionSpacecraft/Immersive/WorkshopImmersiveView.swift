@@ -112,8 +112,13 @@ struct WorkshopImmersiveView: View {
         }
         .gesture(DragGesture(minimumDistance: 0.01, coordinateSpace: .local).targetedToAnyEntity()
             .onChanged { v in
+                // Loose parts share this gesture; a second targeted DragGesture never fires behind targetedToAnyEntity.
+                if v.entity.components.has(LoosePartComponent.self) {
+                    if let parent = v.entity.parent { v.entity.position = v.convert(v.location3D, from: .local, to: parent) }
+                    return
+                }
                 let a = model.assembly
-                guard a.active, let plan = a.plan, let i = AssemblyStage.rackIndex(of: v.entity) else { return }
+                guard a.active, let plan = a.plan, let i = AssemblyStage.rackIndex(of: v.entity), i == a.index else { return }
                 // Grabbing a rack part during Watch build or Show me hands control to the player.
                 // Ignore pinches/taps (e.g. the Watch build button) that land on a rack part; take over only on a real lift.
                 if a.mode == .watch || a.showMe {
@@ -131,7 +136,17 @@ struct WorkshopImmersiveView: View {
                     a.warning = "\(cur.instance.definition.displayName) goes here. Put the \(plan.steps[i].instance.definition.displayName) back."
                 } else if r == .snapped { a.warning = nil }
             }
-            .onEnded { _ in
+            .onEnded { v in
+                if let lp = v.entity.components[LoosePartComponent.self] {
+                    let p = v.entity.position(relativeTo: nil)
+                    // Dropped near the craft: add to stack and return to stand. Elsewhere: stay where dropped.
+                    if abs(p.x) < 3, p.z > -6, p.z < 0 {
+                        model.addPart(lp.partId)
+                        v.entity.move(to: Transform(scale: v.entity.scale, rotation: v.entity.orientation, translation: lp.home),
+                                      relativeTo: v.entity.parent, duration: 0.4)
+                    }
+                    return
+                }
                 guard let i = held else { return }
                 held = nil
                 let a = model.assembly
@@ -145,7 +160,7 @@ struct WorkshopImmersiveView: View {
         .task(id: StageKey(index: model.assembly.index, mode: model.assembly.mode, plan: model.assembly.plan?.target.id,
                            table: model.workshopTabletop)) {
             let a = model.assembly
-            await stage.rebuild(plan: a.plan, index: a.index, showRack: a.active, craftHolder: craftHolder)
+            await stage.rebuild(plan: a.plan, index: a.index, showRack: a.active, manual: a.mode == .manual, craftHolder: craftHolder)
             env?.illuminate(stage.rack)
         }
         .task(id: PlayKey(index: model.assembly.index, playing: model.assembly.playing, showMe: model.assembly.showMe,
@@ -162,21 +177,6 @@ struct WorkshopImmersiveView: View {
             a.lock(model)
             try? await Task.sleep(for: .seconds(0.3 / a.speed))
         }
-        .gesture(DragGesture().targetedToEntity(where: .has(LoosePartComponent.self))
-            .onChanged { v in
-                guard let parent = v.entity.parent else { return }
-                v.entity.position = v.convert(v.location3D, from: .local, to: parent)
-            }
-            .onEnded { v in
-                guard let lp = v.entity.components[LoosePartComponent.self] else { return }
-                let p = v.entity.position(relativeTo: nil)
-                // Dropped near the craft: add to stack and return to stand. Elsewhere: stay where dropped.
-                if abs(p.x) < 3, p.z > -6, p.z < 0 {
-                    model.addPart(lp.partId)
-                    v.entity.move(to: Transform(scale: v.entity.scale, rotation: v.entity.orientation, translation: lp.home),
-                                  relativeTo: v.entity.parent, duration: 0.4)
-                }
-            })
         .task(id: CraftKey(craft: model.craft, sel: model.selectedStackPart, table: model.workshopTabletop)) {
             let e = await CraftBuilder.build(model.craft, markers: true, highlight: model.selectedStackPart)
             craftHolder.children.filter { $0.name == "craft" }.forEach { $0.removeFromParent() }

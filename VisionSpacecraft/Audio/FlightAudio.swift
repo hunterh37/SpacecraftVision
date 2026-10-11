@@ -48,6 +48,12 @@ final class FlightAudio {
         }
         if let url = Self.wav("cue-explosion", { Self.explosion(seconds: 2.5) }),
            let res = try? AudioFileResource.load(contentsOf: url) { cues["explosion"] = res }
+        if let url = Self.wav("cue-gate", { Self.chime([988, 1319], seconds: 0.5) }),
+           let res = try? AudioFileResource.load(contentsOf: url) { cues["gate"] = res }
+        if let url = Self.wav("cue-chute", { Self.whoosh(seconds: 0.7) }),
+           let res = try? AudioFileResource.load(contentsOf: url) { cues["chute"] = res }
+        if let url = Self.wav("cue-thud", { Self.thud(seconds: 0.35) }),
+           let res = try? AudioFileResource.load(contentsOf: url) { cues["thud"] = res }
         for c in [roar, crackle, prop, wind] { c?.gain = -80; c?.play() }
     }
 
@@ -79,7 +85,54 @@ final class FlightAudio {
         cueSource.playAudio(r)
     }
 
+    /// Plays a cue from a spatial source on `entity` (adds a SpatialAudioComponent if missing).
+    func cue(_ name: String, at entity: Entity, gain: Double = 0) {
+        guard Self.enabled, let r = cues[name] else { return }
+        if entity.components[SpatialAudioComponent.self] == nil { entity.components.set(SpatialAudioComponent(gain: gain)) }
+        entity.playAudio(r)
+    }
+
     // MARK: Synthesis
+
+    /// Bell partials per note, notes staggered by 80 ms.
+    static func chime(_ notes: [Double], seconds: Double) -> [Float] {
+        let n = Int(seconds * rate)
+        return (0..<n).map { i in
+            let t = Double(i) / rate
+            var v = 0.0
+            for (k, f) in notes.enumerated() {
+                let tk = t - Double(k) * 0.08
+                guard tk > 0 else { continue }
+                v += (sin(2 * .pi * f * tk) + 0.3 * sin(2 * .pi * f * 2.76 * tk)) * exp(-tk * 7) * min(1, tk * 300)
+            }
+            return Float(v * 0.35)
+        }
+    }
+
+    /// Band-swept noise with a canopy snap at the end.
+    static func whoosh(seconds: Double) -> [Float] {
+        let n = Int(seconds * rate)
+        var r = RNG(s: 11), lp: Float = 0
+        return (0..<n).map { i in
+            let f = Float(i) / Float(n)
+            let k = 0.02 + 0.2 * f
+            lp += (r.next() - lp) * k
+            let snap: Float = f > 0.8 ? r.next() * exp(-(f - 0.8) * 60) : 0
+            return (lp * 2.5 * sin(.pi * min(1, f / 0.85)) + snap * 0.8) * 0.7
+        }
+    }
+
+    /// Low impact: 70 Hz decaying sine plus a noise click.
+    static func thud(seconds: Double) -> [Float] {
+        let n = Int(seconds * rate)
+        var r = RNG(s: 5)
+        return (0..<n).map { i in
+            let t = Double(i) / rate
+            let body = sin(2 * .pi * 70 * t * (1 - t)) * exp(-t * 14)
+            let click = Double(r.next()) * exp(-t * 120)
+            return Float((body * 0.8 + click * 0.4) * min(1, t * 2000))
+        }
+    }
 
     static let rate = 44_100.0
 
