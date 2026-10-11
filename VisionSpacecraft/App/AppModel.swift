@@ -5,6 +5,8 @@ import FlightCode
 import FlightRunner
 import Curriculum
 import LabUI
+import TaskGuideCore
+import TaskGuideUI
 
 enum SpaceID: String { case workshop, range, space }
 enum WindowID { static let main = "main", parts = "parts", code = "code", analysis = "analysis" }
@@ -47,8 +49,23 @@ final class AppModel {
     // Flight
     let flight = FlightController()
     let walkthrough = WalkthroughModel()
+    /// Shared BUILD task guide for Workshop. Not a second walkthrough engine.
+    let taskGuide = TaskGuideController()
+    /// When true, the Workshop task panel attachment is shown.
+    var taskGuideVisible = false
     /// Set when the Analysis window first appears (walkthrough step 5).
     var analysisOpened = false
+
+    /// True while Guided Build is presenting guidance (panel visible and not exited).
+    var isGuidedBuildActive: Bool {
+        taskGuideVisible && taskGuide.state.sessionPhase != .exited
+    }
+
+    /// Active semantic target for SwiftUI / RealityKit highlights.
+    var taskGuideTargetID: GuidanceTargetID? {
+        guard isGuidedBuildActive else { return nil }
+        return taskGuide.displayedTargetID
+    }
 
     // Walkthrough signals (Walkthrough/WalkthroughModel.swift predicates and demos)
     var homePath = NavigationPath()
@@ -79,7 +96,31 @@ final class AppModel {
     init() {
         craft = .rHop()
         craft.payloadMass = mission.payloadMass
+        syncTaskGuideSnapshot()
         schedulePreview()
+    }
+
+    // MARK: Task Guide
+
+    func syncTaskGuideSnapshot() {
+        taskGuide.updateSnapshot(TaskGuideBridge.snapshot(craft: craft, blockers: blockers))
+    }
+
+    /// Opens Workshop guidance: suspends competing Workshop tour UI, shows the task panel, syncs craft state.
+    func beginGuidedBuild() {
+        walkthrough.suspendForTaskGuide()
+        taskGuideVisible = true
+        if taskGuide.state.sessionPhase == .exited {
+            // Re-show panel with retained progress; user can Start Build / Reset as needed.
+        }
+        syncTaskGuideSnapshot()
+    }
+
+    /// Hides the task panel and restores walkthrough availability without marking tours done.
+    func endGuidedBuild() {
+        taskGuide.exitGuide()
+        taskGuideVisible = false
+        walkthrough.resumeAfterTaskGuide()
     }
 
     var source: String {
@@ -216,6 +257,7 @@ final class AppModel {
 
     func schedulePreview() {
         if flight.phase == .idle { flight.clearError() }
+        syncTaskGuideSnapshot()
         previewTask?.cancel()
         let src = source, craft = craft, mission = mission
         previewTask = Task {

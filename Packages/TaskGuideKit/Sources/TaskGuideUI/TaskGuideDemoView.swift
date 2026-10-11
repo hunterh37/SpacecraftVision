@@ -41,7 +41,8 @@ public struct TaskGuideDemoView: View {
         .overlay {
             GuidanceHighlightOverlay(
                 activeID: controller.displayedTargetID,
-                bounds: targetBounds
+                bounds: targetBounds,
+                showsArrow: true
             )
         }
         .overlay(alignment: .bottomLeading) {

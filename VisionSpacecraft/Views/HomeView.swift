@@ -57,7 +57,10 @@ struct HomeView: View {
             .navigationDestination(for: SettingsRoute.self) { _ in SettingsView() }
         }
         .ornament(attachmentAnchor: .scene(.trailing), contentAlignment: .leading) {
-            TourCard(tours: [.learn, .missions, .workshop]).padding(.leading, 24)
+            // Hide while Guided Build is active so Task Guide and Walkthrough cards do not compete.
+            if !model.isGuidedBuildActive {
+                TourCard(tours: [.learn, .missions, .workshop]).padding(.leading, 24)
+            }
         }
         .task {
             // Evaluates tour predicates while the range is closed.
@@ -177,6 +180,21 @@ private struct ModeView: View {
                     openWindow(id: WindowID.parts)
                 }
                 .buttonStyle(BrandButtonStyle(tint: mode.tint))
+            }
+            Row(
+                index: "1→4",
+                title: "Guided Build",
+                detail: "Four Build tasks: mission, parts, components, launch readiness. Uses the existing hangar.",
+                tint: mode.tint
+            ) {
+                Button("Start Guided Build") {
+                    model.beginGuidedBuild()
+                    Task { await switcher.show(.workshop) }
+                    openWindow(id: WindowID.parts)
+                }
+                .buttonStyle(BrandButtonStyle(tint: mode.tint))
+                .accessibilityLabel("Start Guided Build")
+                .accessibilityHint("Opens the Workshop with the Build task guide. Does not launch the rocket.")
             }
             Row(index: "▶", title: "Range", detail: "Fly the current craft on the launch range.", tint: mode.tint) {
                 Button("Launch") { Task { await switcher.show(.range) } }

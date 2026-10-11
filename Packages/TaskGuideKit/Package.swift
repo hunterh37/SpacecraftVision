@@ -12,5 +12,6 @@ let package = Package(
         .target(name: "TaskGuideCore"),
         .target(name: "TaskGuideUI", dependencies: ["TaskGuideCore"]),
         .testTarget(name: "TaskGuideCoreTests", dependencies: ["TaskGuideCore"]),
+        .testTarget(name: "TaskGuideUITests", dependencies: ["TaskGuideUI", "TaskGuideCore"]),
     ]
 )

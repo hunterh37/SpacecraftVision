@@ -1,15 +1,30 @@
 import SwiftUI
 import TaskGuideCore
 
-/// Compact floating task board for the BUILD V0 guided mission.
+/// Compact floating task board for the BUILD guided mission.
 public struct TaskBoardView: View {
     var controller: TaskGuideController
+    var host: TaskBoardHostContext
+    var onOpenParts: (() -> Void)?
+    var onGoToLaunchRange: (() -> Void)?
+    var onExitGuide: (() -> Void)?
+
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let panelWidth: CGFloat = 380
 
-    public init(controller: TaskGuideController) {
+    public init(
+        controller: TaskGuideController,
+        host: TaskBoardHostContext = .demo,
+        onOpenParts: (() -> Void)? = nil,
+        onGoToLaunchRange: (() -> Void)? = nil,
+        onExitGuide: (() -> Void)? = nil
+    ) {
         self.controller = controller
+        self.host = host
+        self.onOpenParts = onOpenParts
+        self.onGoToLaunchRange = onGoToLaunchRange
+        self.onExitGuide = onExitGuide
     }
 
     public var body: some View {
@@ -103,9 +118,7 @@ public struct TaskBoardView: View {
 
     private func taskRow(_ task: BuildTaskDefinition) -> some View {
         let status = controller.state.status(for: task)
-        let isFocused = controller.displayedTask?.id == task.id
-            && controller.state.sessionPhase != .overview
-            && controller.state.sessionPhase != .exited
+        let isFocused = isTaskFocused(task)
 
         return Button {
             controller.focusTask(index: task.index)
@@ -125,7 +138,7 @@ public struct TaskBoardView: View {
                             .foregroundStyle(.secondary)
                     }
                     if case .completed(let record) = status, record == .alreadySatisfied {
-                        Text("Already satisfied — present before you started this step.")
+                        Text(BuildMissionV0.alreadyAssembledMessage)
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -149,6 +162,14 @@ public struct TaskBoardView: View {
         .accessibilityLabel("Task \(task.index), \(task.title), \(status.accessibilityLabel)")
     }
 
+    private func isTaskFocused(_ task: BuildTaskDefinition) -> Bool {
+        if let review = controller.reviewTaskIndex {
+            return review == task.index
+        }
+        guard controller.state.sessionPhase == .inProgress else { return false }
+        return controller.state.currentTaskIndex == task.index
+    }
+
     private var detailSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             switch controller.state.sessionPhase {
@@ -161,19 +182,30 @@ public struct TaskBoardView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             case .buildComplete:
-                Text(BuildMissionV0.buildCompleteMessage)
-                    .font(.subheadline.weight(.medium))
-                Text("Launch and Space task guidance are Coming later.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if controller.isReviewing, let task = controller.displayedTask {
+                    reviewedTaskDetail(task)
+                } else {
+                    Text(BuildMissionV0.buildCompleteMessage)
+                        .font(.subheadline.weight(.semibold))
+                    Text(BuildMissionV0.buildCompleteSubtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if let note = host.completionNote {
+                        Text(note)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Text("Launch and Space task guidance are Coming later.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             case .inProgress:
                 if let task = controller.displayedTask {
-                    Text(task.title)
-                        .font(.headline)
-                    Text(task.instruction)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    validationDetail(for: task)
+                    if controller.isReviewing {
+                        reviewedTaskDetail(task)
+                    } else {
+                        liveTaskDetail(task)
+                    }
                 }
             }
         }
@@ -184,6 +216,49 @@ public struct TaskBoardView: View {
                 .fill(Color.primary.opacity(0.04))
         )
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: controller.state.sessionPhase)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: controller.reviewTaskIndex)
+    }
+
+    @ViewBuilder
+    private func liveTaskDetail(_ task: BuildTaskDefinition) -> some View {
+        Text(task.title)
+            .font(.headline)
+        Text(task.instruction)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+        if task.targetID == .missionBrief {
+            missionContextBlock
+        }
+        validationDetail(for: task)
+    }
+
+    @ViewBuilder
+    private func reviewedTaskDetail(_ task: BuildTaskDefinition) -> some View {
+        Text("Reviewing Task \(task.index)")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+        Text(task.title)
+            .font(.headline)
+        Text(task.instruction)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+        if task.targetID == .missionBrief {
+            missionContextBlock
+        }
+        validationDetail(for: task)
+    }
+
+    @ViewBuilder
+    private var missionContextBlock: some View {
+        if let headline = host.missionHeadline {
+            Text(headline)
+                .font(.caption.weight(.semibold))
+        }
+        if let details = host.missionDetails {
+            Text(details)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 
     @ViewBuilder
@@ -193,20 +268,33 @@ public struct TaskBoardView: View {
             EmptyView()
         case .automaticCraftValidation:
             let result = controller.state.componentValidation
-            Text(result.summary)
-                .font(.caption)
-                .foregroundStyle(result.isSatisfied ? Color.green : Color.orange)
+            if result.isSatisfied {
+                let record = controller.state.completionRecords[task.id]
+                Text(record == .alreadySatisfied ? BuildMissionV0.alreadyAssembledMessage : result.summary)
+                    .font(.caption)
+                    .foregroundStyle(Color.green)
+            } else {
+                Text(result.summary)
+                    .font(.caption)
+                    .foregroundStyle(Color.orange)
+            }
         case .automaticPreflightValidation:
             let result = controller.state.preflightValidation
             Text(result.summary)
                 .font(.caption)
                 .foregroundStyle(result.isSatisfied ? Color.green : Color.orange)
+            if result.isSatisfied == false {
+                Text(String(format: "TWR SL: %.2f", result.thrustToWeightSL))
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
     private var controls: some View {
         VStack(spacing: 8) {
             primaryAction
+            secondaryHostActions
             HStack(spacing: 8) {
                 Button("Back") { controller.goBack() }
                     .buttonStyle(.bordered)
@@ -215,11 +303,14 @@ public struct TaskBoardView: View {
                     .frame(maxWidth: .infinity)
                     .accessibilityLabel("Back")
 
-                Button("Exit Guide") { controller.exitGuide() }
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
-                    .frame(maxWidth: .infinity)
-                    .accessibilityLabel("Exit Guide")
+                Button("Exit Guide") {
+                    controller.exitGuide()
+                    onExitGuide?()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .frame(maxWidth: .infinity)
+                .accessibilityLabel("Exit Guide")
             }
 
             Button("Reset Guide") { controller.resetGuide() }
@@ -232,60 +323,83 @@ public struct TaskBoardView: View {
 
     @ViewBuilder
     private var primaryAction: some View {
-        switch controller.state.sessionPhase {
-        case .overview, .exited:
-            Button(BuildMissionV0.startActionLabel) { controller.startBuild() }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .frame(maxWidth: .infinity)
-                .accessibilityLabel(BuildMissionV0.startActionLabel)
-        case .buildComplete:
-            EmptyView()
-        case .inProgress:
-            if let task = controller.state.currentTask,
-               controller.reviewTaskIndex == nil,
-               task.completionKind == .manualAcknowledgment,
-               let label = task.acknowledgmentLabel
-            {
-                Button(label) { controller.acknowledgeCurrent() }
+        if controller.isReviewing {
+            Button(controller.state.sessionPhase == .buildComplete ? "Return to Completion" : "Return to Current Task") {
+                controller.returnToLive()
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .frame(maxWidth: .infinity)
+            .accessibilityLabel(
+                controller.state.sessionPhase == .buildComplete ? "Return to Completion" : "Return to Current Task"
+            )
+        } else {
+            switch controller.state.sessionPhase {
+            case .overview, .exited:
+                Button(BuildMissionV0.startActionLabel) { controller.startBuild() }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
                     .frame(maxWidth: .infinity)
-                    .accessibilityLabel(label)
-            } else if controller.reviewTaskIndex != nil {
-                Button(controller.state.sessionPhase == .buildComplete ? "Back to Completion" : "Return to Current Task") {
-                    if controller.state.sessionPhase == .buildComplete {
-                        // Clear review to show completion message via displayedTask fallback.
-                        controller.focusTask(index: BuildMissionV0.taskCount)
-                        // focusTask on completed keeps review; use reset of review by focusing nil path:
-                        controller.goBack() // no — use explicit clear
-                    }
-                    if let current = controller.state.currentTaskIndex {
-                        controller.focusTask(index: current)
-                    } else {
-                        // buildComplete: clear review by focusing last then we need clearReview
-                        controller.focusTask(index: BuildMissionV0.taskCount)
-                    }
+                    .accessibilityLabel(BuildMissionV0.startActionLabel)
+            case .buildComplete:
+                if host.showsGoToLaunchRangeAction, let go = onGoToLaunchRange {
+                    Button(BuildMissionV0.goToLaunchRangeLabel, action: go)
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityLabel(BuildMissionV0.goToLaunchRangeLabel)
+                        .accessibilityHint("Opens the existing launch range. Does not start a flight.")
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .frame(maxWidth: .infinity)
-            } else if let task = controller.state.currentTask, task.completionKind != .manualAcknowledgment {
-                Text("Waiting for automatic validation…")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityLabel("Waiting for automatic validation")
+            case .inProgress:
+                if let task = controller.state.currentTask,
+                   task.completionKind == .manualAcknowledgment,
+                   let label = task.acknowledgmentLabel
+                {
+                    Button(label) { controller.acknowledgeCurrent() }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityLabel(label)
+                } else if let task = controller.state.currentTask, task.completionKind != .manualAcknowledgment {
+                    Text("Waiting for automatic validation…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityLabel("Waiting for automatic validation")
+                }
             }
         }
     }
 
+    @ViewBuilder
+    private var secondaryHostActions: some View {
+        if shouldOfferOpenParts, let open = onOpenParts {
+            Button(BuildMissionV0.openPartsLabel, action: open)
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .frame(maxWidth: .infinity)
+                .accessibilityLabel(BuildMissionV0.openPartsLabel)
+        }
+    }
+
+    private var shouldOfferOpenParts: Bool {
+        guard host.showsOpenPartsAction, !controller.isReviewing else { return false }
+        guard let task = controller.state.currentTask else { return false }
+        switch task.targetID {
+        case .partsPalette, .craftAssembly:
+            return controller.state.sessionPhase == .inProgress
+        default:
+            return false
+        }
+    }
+
     private var canGoBack: Bool {
+        if controller.isReviewing { return true }
         switch controller.state.sessionPhase {
         case .inProgress, .buildComplete:
             return true
         case .overview, .exited:
-            return controller.reviewTaskIndex != nil
+            return false
         }
     }
 

@@ -1,11 +1,15 @@
 import SwiftUI
 import LabUI
 import SpacecraftCore
+import TaskGuideCore
+import TaskGuideUI
 
 /// Part palette (specs/02): mission-allowed parts, the current stack top to bottom with radial parts,
 /// fuel load per tank, reorder and remove.
 struct PartPickerView: View {
     @Environment(AppModel.self) private var model
+    @State private var targetBounds: [GuidanceTargetID: CGRect] = [:]
+    private let guidanceSpace = "PartsGuidance"
 
     var body: some View {
         @Bindable var model = model
@@ -35,6 +39,8 @@ struct PartPickerView: View {
                         }
                     }
                 }
+                .guidanceTarget(.partsPalette, coordinateSpaceName: guidanceSpace)
+
                 Section("Stack, top to bottom") {
                     if model.craft.stack.isEmpty { Text("Empty. Add a probe core first.").foregroundStyle(.secondary) }
                     ForEach(model.craft.stack) { p in
@@ -78,7 +84,17 @@ struct PartPickerView: View {
                 }
             }
             .navigationTitle("Parts")
+            .coordinateSpace(name: guidanceSpace)
+            .onPreferenceChange(GuidanceTargetBoundsKey.self) { targetBounds = $0 }
+            .overlay {
+                GuidanceHighlightOverlay(
+                    activeID: model.taskGuideTargetID == .partsPalette ? .partsPalette : nil,
+                    bounds: targetBounds,
+                    showsArrow: false
+                )
+            }
         }
+        .onAppear { model.syncTaskGuideSnapshot() }
     }
 
     var budgetMeter: some View {

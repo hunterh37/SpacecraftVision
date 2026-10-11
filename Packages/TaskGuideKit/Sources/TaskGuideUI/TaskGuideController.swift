@@ -18,23 +18,32 @@ public final class TaskGuideController {
         self.state = engine.state
     }
 
+    /// True while reviewing a completed task (including after build-complete).
+    public var isReviewing: Bool { reviewTaskIndex != nil }
+
     public var displayedTask: BuildTaskDefinition? {
         if let reviewTaskIndex {
             return BuildMissionV0.task(at: reviewTaskIndex)
-        }
-        if state.sessionPhase == .buildComplete {
-            return BuildMissionV0.tasks.last
         }
         return state.currentTask
     }
 
     public var displayedTargetID: GuidanceTargetID? {
         switch state.sessionPhase {
-        case .overview, .exited:
+        case .overview, .exited, .buildComplete:
+            // Highlight only while actively reviewing a completed task after build-complete.
+            if state.sessionPhase == .buildComplete, let reviewTaskIndex {
+                return BuildMissionV0.task(at: reviewTaskIndex)?.targetID
+            }
             return nil
-        case .buildComplete, .inProgress:
-            return displayedTask?.targetID
+        case .inProgress:
+            return displayedTask?.targetID ?? state.activeTargetID
         }
+    }
+
+    /// Whether any automatic task completed as already-satisfied (prebuilt craft path).
+    public var hadAlreadySatisfiedAutomaticTask: Bool {
+        state.completionRecords.values.contains(.alreadySatisfied)
     }
 
     public func updateSnapshot(_ snapshot: CraftStateSnapshot) {
@@ -43,13 +52,13 @@ public final class TaskGuideController {
     }
 
     public func startBuild() {
-        reviewTaskIndex = nil
+        clearReviewFocus()
         engine.startBuild()
         refresh()
     }
 
     public func acknowledgeCurrent() {
-        reviewTaskIndex = nil
+        clearReviewFocus()
         engine.acknowledgeCurrent()
         refresh()
     }
@@ -59,9 +68,13 @@ public final class TaskGuideController {
             if review > 1 {
                 reviewTaskIndex = review - 1
             } else {
-                // From reviewing task 1, leave review; if advancement is still on task 1, show overview.
-                reviewTaskIndex = nil
-                if state.currentTaskIndex == 1 {
+                // Leave review of task 1. Only return to overview when advancement is still on task 1
+                // with no completions beyond it (i.e. user backed out before acknowledging).
+                clearReviewFocus()
+                if state.sessionPhase == .inProgress,
+                   state.currentTaskIndex == 1,
+                   state.completionRecords.isEmpty
+                {
                     engine.returnToOverview()
                     refresh()
                 }
@@ -73,6 +86,7 @@ public final class TaskGuideController {
         case .overview, .exited:
             return
         case .buildComplete:
+            // Enter review of the last completed task without clearing completion.
             reviewTaskIndex = BuildMissionV0.taskCount
         case .inProgress:
             guard let current = state.currentTaskIndex else { return }
@@ -80,19 +94,20 @@ public final class TaskGuideController {
                 engine.returnToOverview()
                 refresh()
             } else {
+                // Review the previous completed task; do not rewind engine progress.
                 reviewTaskIndex = current - 1
             }
         }
     }
 
     public func exitGuide() {
-        reviewTaskIndex = nil
+        clearReviewFocus()
         engine.exitGuide()
         refresh()
     }
 
     public func resetGuide() {
-        reviewTaskIndex = nil
+        clearReviewFocus()
         engine.resetGuide()
         refresh()
     }
@@ -104,10 +119,15 @@ public final class TaskGuideController {
         case .completed:
             reviewTaskIndex = index
         case .current:
-            reviewTaskIndex = nil
+            clearReviewFocus()
         case .notStarted, .blocked:
             break
         }
+    }
+
+    /// Clears review focus and returns to the live current task or completion summary.
+    public func returnToLive() {
+        clearReviewFocus()
     }
 
     public func clearReviewFocus() {

@@ -83,6 +83,10 @@ final class WalkthroughModel {
     private(set) var autoplaying = false
     /// True while a single step's demo runs.
     private(set) var demoing = false
+    /// When true, automatic tour prompts are deferred for the Task Guide. Does not change `enabled` or mark tours done.
+    private(set) var suspendedForTaskGuide = false
+    private var suspendedTour: TourID?
+    private var suspendedIndex: Int?
     private(set) var rangeTip: TipID?
     var showMore = false
     private var stepStart = Date()
@@ -120,10 +124,34 @@ final class WalkthroughModel {
 
     /// Called when a mode screen or the range appears.
     func startIfNeeded(_ t: TourID) {
-        guard enabled, !isDone(t), tour != t, !pending.contains(t) else { return }
+        guard enabled, !suspendedForTaskGuide, !isDone(t), tour != t, !pending.contains(t) else { return }
         if tour != nil { pending.append(t); return }
         begin(t, at: forcedStep ?? 0)
         forcedStep = nil
+    }
+
+    /// Hides the active tour card without marking tours complete or changing the global preference.
+    /// Used while Guided Build is active so Task Guide and Walkthrough do not compete.
+    func suspendForTaskGuide() {
+        guard !suspendedForTaskGuide else { return }
+        suspendedForTaskGuide = true
+        suspendedTour = tour
+        suspendedIndex = index
+        stopAutoplay()
+        rangeTip = nil
+        end(markDone: false)
+    }
+
+    /// Restores a tour that was active when Guided Build started, if still eligible.
+    func resumeAfterTaskGuide() {
+        guard suspendedForTaskGuide else { return }
+        let savedTour = suspendedTour
+        let savedIndex = suspendedIndex
+        suspendedForTaskGuide = false
+        suspendedTour = nil
+        suspendedIndex = nil
+        guard enabled, let t = savedTour, let i = savedIndex, !isDone(t) else { return }
+        begin(t, at: i)
     }
 
     /// Range entry point kept for RangeImmersiveView.
@@ -274,7 +302,7 @@ final class WalkthroughModel {
         rangeTip = nil
     }
 
-    func shouldShow(_ t: TipID) -> Bool { enabled && !seenTips.contains(t.rawValue) }
+    func shouldShow(_ t: TipID) -> Bool { enabled && !suspendedForTaskGuide && !seenTips.contains(t.rawValue) }
 
     func markSeen(_ t: TipID) {
         seenTips.insert(t.rawValue)

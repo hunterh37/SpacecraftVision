@@ -67,8 +67,12 @@ public struct BuildTaskDefinition: Sendable, Identifiable, Hashable {
 public enum BuildMissionV0 {
     public static let missionTitle = "Build Your First Rocket"
     public static let boardHeader = "YOUR FIRST ROCKET"
-    public static let buildCompleteMessage = "Build phase complete. Ready for the Launch phase."
+    public static let buildCompleteMessage = "BUILD CHECKS COMPLETE"
+    public static let buildCompleteSubtitle = "The rocket is ready for launch checks on the Launch Range."
     public static let startActionLabel = "Start Build"
+    public static let goToLaunchRangeLabel = "Go to Launch Range"
+    public static let openPartsLabel = "Open Parts"
+    public static let alreadyAssembledMessage = "Already assembled — essential components are present."
 
     public static let tasks: [BuildTaskDefinition] = [
         BuildTaskDefinition(
@@ -78,7 +82,7 @@ public enum BuildMissionV0 {
             instruction: "Before building, understand your objective and the constraints your rocket must satisfy.",
             targetID: .missionBrief,
             completionKind: .manualAcknowledgment,
-            acknowledgmentLabel: "I understand"
+            acknowledgmentLabel: "I Understand"
         ),
         BuildTaskDefinition(
             id: "find-parts",
@@ -87,7 +91,7 @@ public enum BuildMissionV0 {
             instruction: "Locate the Parts panel. Learn where the command core, fuel tank, and engine are selected.",
             targetID: .partsPalette,
             completionKind: .manualAcknowledgment,
-            acknowledgmentLabel: "I've found the parts"
+            acknowledgmentLabel: "I've Found the Parts"
         ),
         BuildTaskDefinition(
             id: "check-components",

@@ -2,24 +2,24 @@ import SwiftUI
 import TaskGuideCore
 
 /// Preference key that publishes target bounds in a shared coordinate space.
-struct GuidanceTargetBoundsKey: PreferenceKey {
-    static let defaultValue: [GuidanceTargetID: CGRect] = [:]
+public struct GuidanceTargetBoundsKey: PreferenceKey {
+    public static let defaultValue: [GuidanceTargetID: CGRect] = [:]
 
-    static func reduce(value: inout [GuidanceTargetID: CGRect], nextValue: () -> [GuidanceTargetID: CGRect]) {
+    public static func reduce(value: inout [GuidanceTargetID: CGRect], nextValue: () -> [GuidanceTargetID: CGRect]) {
         value.merge(nextValue(), uniquingKeysWith: { $1 })
     }
 }
 
 struct GuidanceTargetAnchor: ViewModifier {
     let id: GuidanceTargetID
-    let coordinateSpace: CoordinateSpace
+    let coordinateSpaceName: String
 
     func body(content: Content) -> some View {
         content.background(
             GeometryReader { geo in
                 Color.clear.preference(
                     key: GuidanceTargetBoundsKey.self,
-                    value: [id: geo.frame(in: coordinateSpace)]
+                    value: [id: geo.frame(in: .named(coordinateSpaceName))]
                 )
             }
         )
@@ -27,19 +27,26 @@ struct GuidanceTargetAnchor: ViewModifier {
 }
 
 public extension View {
-    /// Marks a representative UI element as a guidance target for the 2D preview.
-    func guidanceTarget(_ id: GuidanceTargetID, coordinateSpace: CoordinateSpace = .named("TaskGuideDemo")) -> some View {
-        modifier(GuidanceTargetAnchor(id: id, coordinateSpace: coordinateSpace))
+    /// Marks a UI element as a guidance target within a named coordinate space.
+    func guidanceTarget(_ id: GuidanceTargetID, coordinateSpaceName: String = "TaskGuideDemo") -> some View {
+        modifier(GuidanceTargetAnchor(id: id, coordinateSpaceName: coordinateSpaceName))
     }
 }
 
 /// Subtle ring outline drawn around the active guidance target bounds.
-struct GuidanceHighlightOverlay: View {
+public struct GuidanceHighlightOverlay: View {
     let activeID: GuidanceTargetID?
     let bounds: [GuidanceTargetID: CGRect]
+    var showsArrow: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    var body: some View {
+    public init(activeID: GuidanceTargetID?, bounds: [GuidanceTargetID: CGRect], showsArrow: Bool = true) {
+        self.activeID = activeID
+        self.bounds = bounds
+        self.showsArrow = showsArrow
+    }
+
+    public var body: some View {
         ZStack {
             if let activeID, let rect = bounds[activeID] {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -49,7 +56,7 @@ struct GuidanceHighlightOverlay: View {
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
 
-                if !reduceMotion {
+                if showsArrow && !reduceMotion {
                     GuidanceArrow(from: arrowOrigin(for: rect), to: rect)
                         .stroke(Color.accentColor.opacity(0.85), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                         .allowsHitTesting(false)
