@@ -227,9 +227,16 @@ def steer(bearing, target_speed):
     course = yaw + bearing
     ax = K_V * (target_speed * math.sin(course) - v[0])
     ay = K_V * (target_speed * math.cos(course) - v[1])
+    a = math.hypot(ax, ay)
+    if a < 0.2:
+        return 0.0, 0.0
     err = wrap(math.atan2(ax, ay) - yaw)
-    # Tilt only as far as the nose already points along the needed acceleration.
-    tilt = math.clamp(math.atan(math.hypot(ax, ay) / G), 0.0, TILT_MAX) * max(math.cos(err), 0.0)
+    sign = 1.0
+    if abs(err) > math.pi / 2.0:
+        # Lean back past vertical instead of turning the heading around.
+        err = wrap(err + math.pi)
+        sign = -1.0
+    tilt = sign * math.clamp(math.atan(a / G), 0.0, TILT_MAX) * math.cos(err)
     return err, tilt
 
 def hold_tilt(tilt):
@@ -308,9 +315,16 @@ def steer(bearing, target_speed):
     course = yaw + bearing
     ax = K_V * (target_speed * math.sin(course) - v[0])
     ay = K_V * (target_speed * math.cos(course) - v[1])
+    a = math.hypot(ax, ay)
+    if a < 0.2:
+        return 0.0, 0.0
     err = wrap(math.atan2(ax, ay) - yaw)
-    # Tilt only as far as the nose already points along the needed acceleration.
-    tilt = math.clamp(math.atan(math.hypot(ax, ay) / G), 0.0, TILT_MAX) * max(math.cos(err), 0.0)
+    sign = 1.0
+    if abs(err) > math.pi / 2.0:
+        # Lean back past vertical instead of turning the heading around.
+        err = wrap(err + math.pi)
+        sign = -1.0
+    tilt = sign * math.clamp(math.atan(a / G), 0.0, TILT_MAX) * math.cos(err)
     return err, tilt
 
 def hold_tilt(tilt):

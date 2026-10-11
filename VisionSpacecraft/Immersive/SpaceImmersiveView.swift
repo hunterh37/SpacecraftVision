@@ -34,12 +34,14 @@ struct SpaceImmersiveView: View {
                 model.flight.tick(e.deltaTime)
                 scene.frame(dt: e.deltaTime, flight: model.flight)
             }
+            model.loadingSpace = nil
         } update: { content, attachments in
             scene.place(attachments)
         } attachments: {
             Attachment(id: "verdict") {
                 VerdictCard(scene: scene, verdict: verdict, onReplay: { scene.startReplay() },
                             onLaunch: { Task { await switcher.show(.range) } },
+                            onRestart: { model.followedLaunch = model.flight.launchID + 2; model.flight.reset(); model.launch() },
                             onCode: { openWindow(id: WindowID.code) },
                             onAnalysis: { openWindow(id: WindowID.analysis) })
                     .environment(model)
@@ -153,8 +155,10 @@ final class SpaceScene {
         diorama.addChild(pad)
     }
 
-    /// Dark globe with a latitude and longitude grid and sparse lights, drawn once.
+    /// NASA Blue Marble (public domain), equirectangular 4096x2048; grid globe as fallback.
     private static func planetTexture() -> TextureResource? {
+        if let url = Bundle.main.url(forResource: "Earth", withExtension: "jpg"),
+           let tex = try? TextureResource.load(contentsOf: url, options: .init(semantic: .color)) { return tex }
         let size = CGSize(width: 1024, height: 512)
         let img = UIGraphicsImageRenderer(size: size).image { ctx in
             let c = ctx.cgContext
@@ -426,6 +430,7 @@ private struct VerdictCard: View {
     let verdict: FlightVerdict
     var onReplay: () -> Void
     var onLaunch: () -> Void
+    var onRestart: () -> Void
     var onCode: () -> Void
     var onAnalysis: () -> Void
 
@@ -455,6 +460,10 @@ private struct VerdictCard: View {
             }
             if scene.mode == .review { replayControls }
             legend
+            if verdict.state != .noFlight {
+                Button("Restart launch", systemImage: "flame.fill") { onRestart() }
+                    .buttonStyle(.borderedProminent).tint(Brand.ignition)
+            }
             HStack(spacing: 10) {
                 Button("Launch scene", systemImage: "arrow.down.to.line") { onLaunch() }
                 Button("Edit code", systemImage: "chevron.left.forwardslash.chevron.right") { onCode() }

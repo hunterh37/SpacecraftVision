@@ -32,6 +32,8 @@ final class AppModel {
 
     // Immersive
     var openSpace: SpaceID?
+    /// Set while an immersive space opens and builds its assets; drives the loading overlay.
+    var loadingSpace: SpaceID?
     /// Follow a flight from the launch range into the space scene (once the craft has climbed, and at the end).
     var followToSpace = true
     var followedLaunch = -1
@@ -278,6 +280,7 @@ final class AppModel {
         craft = c
         selectedStackPart = nil
         schedulePreview()
+        syncTaskGuideSnapshot()
     }
 
     /// Saturn V Apollo stack (RealityHD stage assets, AS-506 masses).

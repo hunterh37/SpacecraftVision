@@ -135,25 +135,24 @@ public struct PythonEditor: View {
                 .frame(width: 40).padding(.top, 12)
                 ZStack(alignment: .topLeading) {
                     VStack(alignment: .leading, spacing: 0) {
-                        ForEach(Array(lines.enumerated()), id: \.offset) { i, l in
-                            Text(PythonSyntax.attributed(l.isEmpty ? " " : l, size: fontSize)).font(Lab.mono(fontSize)).fixedSize().frame(height: lh, alignment: .leading)
-                                .underline(errorLine == i + 1, color: Lab.danger)
+                        ForEach(Array(lines.indices), id: \.self) { i in
+                            Color.clear.frame(height: lh)
                                 .background(errorLine == i + 1 ? Lab.danger.opacity(0.12) : .clear)
                         }
                     }
-                    .padding(.top, 12).padding(.leading, 12)
+                    .padding(.top, 12)
                     .allowsHitTesting(false)
+                    #if canImport(UIKit)
+                    CodeTextView(text: $text, fontSize: fontSize, lineHeight: lh, errorLine: errorLine)
+                        .frame(minWidth: 320, minHeight: CGFloat(lines.count) * lh + 28, alignment: .topLeading)
+                    #else
                     TextEditor(text: $text)
                         .font(Lab.mono(fontSize))
                         .scrollContentBackground(.hidden)
-                        .foregroundStyle(.clear)
-                        .tint(.white)
                         .scrollDisabled(true)
                         .autocorrectionDisabled()
-                        #if os(visionOS)
-                        .textInputAutocapitalization(.never)
-                        #endif
                         .frame(minWidth: 320, minHeight: CGFloat(lines.count) * lh + 28)
+                    #endif
                     if let l = errorLine, let t = errorText {
                         ErrorPopup(text: t).offset(x: 12, y: 12 + CGFloat(l) * lh + 4).allowsHitTesting(false)
                     }
@@ -165,3 +164,108 @@ public struct PythonEditor: View {
         .overlay { RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Lab.edge.opacity(0.22), lineWidth: 1) }
     }
 }
+
+#if canImport(UIKit)
+/// UITextView that colours its own text storage, so the caret and the glyphs are the same text.
+/// Insets match the gutter: 12 pt top, 12 pt leading, no line fragment padding, fixed line height, no wrap.
+struct CodeTextView: UIViewRepresentable {
+    @Binding var text: String
+    var fontSize: CGFloat
+    var lineHeight: CGFloat
+    var errorLine: Int?
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeUIView(context: Context) -> UITextView {
+        let v = UITextView()
+        v.backgroundColor = .clear
+        v.isScrollEnabled = false
+        v.textContainerInset = UIEdgeInsets(top: 12, left: 12, bottom: 16, right: 12)
+        v.textContainer.lineFragmentPadding = 0
+        v.textContainer.widthTracksTextView = false
+        v.textContainer.size = CGSize(width: 10_000, height: CGFloat.greatestFiniteMagnitude)
+        v.textContainer.lineBreakMode = .byClipping
+        v.autocorrectionType = .no
+        v.autocapitalizationType = .none
+        v.spellCheckingType = .no
+        v.smartQuotesType = .no
+        v.smartDashesType = .no
+        v.smartInsertDeleteType = .no
+        v.keyboardType = .asciiCapable
+        v.tintColor = .white
+        v.delegate = context.coordinator
+        context.coordinator.apply(text, to: v)
+        return v
+    }
+
+    func updateUIView(_ v: UITextView, context: Context) {
+        context.coordinator.parent = self
+        if v.text != text { context.coordinator.apply(text, to: v) }
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UITextView, context: Context) -> CGSize? {
+        let rows = CGFloat(text.components(separatedBy: "\n").count)
+        let longest = text.components(separatedBy: "\n").map(\.count).max() ?? 0
+        let charW = ("M" as NSString).size(withAttributes: [.font: UIFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)]).width
+        let w = max(proposal.width ?? 320, CGFloat(longest + 4) * charW + 24)
+        return CGSize(width: w, height: rows * lineHeight + 28)
+    }
+
+    final class Coordinator: NSObject, UITextViewDelegate {
+        var parent: CodeTextView
+        init(_ p: CodeTextView) { parent = p }
+
+        func attributed(_ s: String) -> NSAttributedString {
+            let font = UIFont.monospacedSystemFont(ofSize: parent.fontSize, weight: .regular)
+            let para = NSMutableParagraphStyle()
+            para.minimumLineHeight = parent.lineHeight; para.maximumLineHeight = parent.lineHeight
+            let out = NSMutableAttributedString()
+            let lines = s.components(separatedBy: "\n")
+            for (i, line) in lines.enumerated() {
+                for r in PythonSyntax.runs(line) {
+                    var a: [NSAttributedString.Key: Any] = [.font: font, .paragraphStyle: para, .foregroundColor: UIColor(PythonSyntax.color(r.kind))]
+                    if r.kind == .comment, let d = font.fontDescriptor.withSymbolicTraits(.traitItalic) { a[.font] = UIFont(descriptor: d, size: parent.fontSize) }
+                    if parent.errorLine == i + 1 { a[.underlineStyle] = NSUnderlineStyle.single.rawValue; a[.underlineColor] = UIColor(Lab.danger) }
+                    out.append(NSAttributedString(string: r.text, attributes: a))
+                }
+                if i < lines.count - 1 { out.append(NSAttributedString(string: "\n", attributes: [.font: font, .paragraphStyle: para])) }
+            }
+            return out
+        }
+
+        func typing() -> [NSAttributedString.Key: Any] {
+            let para = NSMutableParagraphStyle()
+            para.minimumLineHeight = parent.lineHeight; para.maximumLineHeight = parent.lineHeight
+            return [.font: UIFont.monospacedSystemFont(ofSize: parent.fontSize, weight: .regular), .paragraphStyle: para, .foregroundColor: UIColor(Lab.Syntax.plain)]
+        }
+
+        func apply(_ s: String, to v: UITextView) {
+            let sel = v.selectedRange
+            v.attributedText = attributed(s)
+            v.typingAttributes = typing()
+            let n = (s as NSString).length
+            v.selectedRange = NSRange(location: min(sel.location, n), length: min(sel.length, max(0, n - min(sel.location, n))))
+        }
+
+        func textView(_ v: UITextView, shouldChangeTextIn range: NSRange, replacementText t: String) -> Bool {
+            if t == "\t" { v.insertText("    "); return false }
+            if t == "\n" {
+                let ns = v.text as NSString
+                let lineStart = ns.lineRange(for: NSRange(location: range.location, length: 0)).location
+                let line = ns.substring(with: NSRange(location: lineStart, length: range.location - lineStart))
+                var indent = String(line.prefix { $0 == " " })
+                if line.trimmingCharacters(in: .whitespaces).hasSuffix(":") { indent += "    " }
+                v.insertText("\n" + indent); return false
+            }
+            return true
+        }
+
+        func textViewDidChange(_ v: UITextView) {
+            guard v.markedTextRange == nil else { return }
+            let s = v.text ?? ""
+            apply(s, to: v)
+            if parent.text != s { parent.text = s }
+        }
+    }
+}
+#endif

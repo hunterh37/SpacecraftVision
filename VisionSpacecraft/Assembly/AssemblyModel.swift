@@ -58,7 +58,7 @@ final class AssemblyModel {
 
     func restart(_ model: AppModel) { index = 0; warning = nil; apply(model) }
 
-    func takeOver() { mode = .manual; playing = false }
+    func takeOver() { mode = .manual; playing = false; showMe = false }
 
     private func apply(_ model: AppModel) {
         guard let p = plan else { return }

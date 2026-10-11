@@ -176,7 +176,7 @@ final class AssemblyStage {
         let want = hand + (grabOffset ?? .zero)
         let next = heavy ? pos + (want - pos) * 0.35 : want
         guard let target else { e.setPosition(next, relativeTo: nil); return .free }
-        let radius = max(0.3 * target.scale.x, 0.08)
+        let radius = max(0.6 * target.scale.x, 0.12)
         let near = simd_distance(next, target.translation) < radius
         if near && i == current {
             e.move(to: target, relativeTo: nil, duration: 0.12)
