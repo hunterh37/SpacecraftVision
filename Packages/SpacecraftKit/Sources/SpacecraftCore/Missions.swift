@@ -150,7 +150,7 @@ public struct Mission: Codable, Sendable, Hashable, Identifiable {
     public static let m2 = Mission(id: "M2", title: "Gates", lesson: 2, courseId: "C2", payloadMass: 20, massCap: 1_600,
                                    partCap: 16, budget: 26_000, energyCap: 2_500, fixedFuelLoad: nil,
                                    allowedParts: m1Parts + ["fuel-tank-m", "decoupler"], goal: .gates,
-                                   parFuel: 260, parClearance: 6)
+                                   parFuel: 330, parClearance: 6)
     public static let all = [m1, m1w, m1t, m1p, m2]
     public static func named(_ id: String) -> Mission? { all.first { $0.id == id } }
 }

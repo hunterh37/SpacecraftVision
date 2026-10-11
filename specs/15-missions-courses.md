@@ -264,7 +264,7 @@ positive command), `test_zero_error_zero_command`.
 | G4 | `ring-gate` | (60, 800, 300) | 12 | y = 800 |
 | G5 | `ring-gate` | (0, 1,000, 300) | 12 | y = 1,000 |
 
-Pass: G1 to G5 in order, finish crossed, no failure. Par: fuel 260 kg, clearance 6 m (distance from
+Pass: G1 to G5 in order, finish crossed, no failure. Par: fuel 330 kg, clearance 6 m (distance from
 CoM to the gate torus at each pass, minimum).
 
 Course C3 (drift, M3) is C2 with wind from 270 deg at 8 m/s, moderate gusts, seed 3303, and gate
@@ -284,11 +284,15 @@ import math
 #   yaw rate = KP * error + KI * integral + KD * derivative
 
 G = 9.80665
-CRUISE_SPEED = 25.0      # m/s horizontal
+CRUISE_SPEED = 15.0      # m/s horizontal
 KP = 0.0
 KI = 0.0
 KD = 0.0
 I_LIMIT = 1.0            # rad s, integral clamp
+TILT_MAX = 0.45          # rad
+K_V = 0.6                # 1/s, velocity error to acceleration
+BRAKE = 1.5              # m/s2, planned braking when nearing the target height
+VZ_MAX = 20.0            # m/s climb or sink limit
 
 pid = {"integral": 0.0, "prev": 0.0, "first": True}
 
@@ -302,14 +306,30 @@ def wrap(a):
 def throttle_for_altitude(target_alt):
     pitch, yaw, roll = craft.attitude()
     vz = craft.velocity()[2]
-    accel = math.clamp(0.8 * (target_alt - craft.altitude()) - 1.2 * vz, -4.0, 4.0)
+    err = target_alt - craft.altitude()
+    vz_target = math.clamp(math.copysign(math.sqrt(2.0 * BRAKE * abs(err)), err), -VZ_MAX, VZ_MAX)
+    accel = math.clamp(1.0 * (vz_target - vz), -4.0, 4.0)
     s = max(math.sin(pitch), 0.3)
-    return math.clamp(craft.mass() * (G + accel) / (craft.thrust_max() * s), 0.4, 1.0)
+    t = craft.mass() * (G + accel) / (craft.thrust_max() * s)
+    # Below the 0.4 floor the engine cannot throttle down: shut it off for a moment instead.
+    if t < 0.3:
+        return 0.0
+    return math.clamp(t, 0.4, 1.0)
 
-def hold_speed_pitch(target_speed):
+def steer(bearing, target_speed):
+    # Horizontal acceleration that turns the velocity toward the target at target_speed.
+    # Returns (heading error to that acceleration, rad; tilt, rad). The nose tilts along its heading.
     v = craft.velocity()
-    vh = math.hypot(v[0], v[1])
-    tilt = math.clamp(math.radians(1.5) * (target_speed - vh), 0.0, math.radians(25.0))
+    pitch, yaw, roll = craft.attitude()
+    course = yaw + bearing
+    ax = K_V * (target_speed * math.sin(course) - v[0])
+    ay = K_V * (target_speed * math.cos(course) - v[1])
+    err = wrap(math.atan2(ax, ay) - yaw)
+    # Tilt only as far as the nose already points along the needed acceleration.
+    tilt = math.clamp(math.atan(math.hypot(ax, ay) / G), 0.0, TILT_MAX) * max(math.cos(err), 0.0)
+    return err, tilt
+
+def hold_tilt(tilt):
     pitch, yaw, roll = craft.attitude()
     craft.set_pitch(2.0 * ((math.pi / 2.0 - tilt) - pitch))
 
@@ -328,12 +348,20 @@ def update(dt):
     if craft.time() < 6.0:
         target_alt = 150.0
     craft.set_throttle(throttle_for_altitude(target_alt))
-    hold_speed_pitch(CRUISE_SPEED)
-    craft.set_yaw(heading_pid(bearing, dt))
-    craft.plot("bearing_deg", math.degrees(bearing))
+    err, tilt = steer(bearing, CRUISE_SPEED)
+    hold_tilt(tilt)
+    craft.set_yaw(heading_pid(err, dt))
+    craft.plot("heading_err_deg", math.degrees(err))
 ```
 
 ### L2 reference `lesson02_gates_ref.py`
+
+Tuning (M4): the first L2 helpers held altitude with a fixed 0.8/1.2 gain pair and a 0.4 throttle
+floor, so the climb to G1 reached 27 m/s and overshot the gate by 72 m; with the nose near vertical a
+yaw change did not move the flight path, so G2 to G5 were missed. The helpers now brake on a square-root
+approach profile (BRAKE 1.5 m/s²) and cut the engine below a 0.3 demand, and `steer()` turns the
+velocity error toward the gate into a heading error and tilt, which the PID drives. Cruise 15 m/s. The
+reference passes C2 with 332 kg fuel and 9.9 m minimum clearance (score 76).
 
 Starter with these changes:
 

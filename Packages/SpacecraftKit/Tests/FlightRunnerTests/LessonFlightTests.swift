@@ -49,7 +49,7 @@ struct LessonFlightTests {
         let l = Lesson.all[2]
         let (r, _, sim) = try fly(l.referenceCode, .rGates(), l.mission)
         print("L2 ref", r.gatesPassed, r.failure?.title ?? "pass", r.failure?.body ?? "", sim.position, sim.faultMessages.prefix(3))
-        #expect(r.duration > 0) // Known gap: reference overshoots G1 altitude in this sim.
+        #expect(r.passed)
     }
 
     @Test func previewCompileError() {
