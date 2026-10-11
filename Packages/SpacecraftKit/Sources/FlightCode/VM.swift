@@ -29,7 +29,7 @@ public final class VM {
     public private(set) var instructionsUsed = 0
     /// Called each time execution reaches a new source line. Nil (the default) costs one optional check per instruction.
     public var traceHook: ((TraceStop) -> Void)?
-    private var traceFrames = -1, traceLine = -1, tracePC = -1
+    private var traceLine = [Int](repeating: -1, count: VM.maxDepth + 2), tracePC = [Int](repeating: -1, count: VM.maxDepth + 2)
     var budget = 0
     var heapUsed = 0
 
@@ -71,12 +71,14 @@ public final class VM {
         return try loop()
     }
 
-    /// Fire the trace hook on entering a new line, a new frame, or after a backward jump (a loop turning over).
+    /// Fire the trace hook on entering a new line in a frame, or after a backward jump (a loop turning over).
+    /// Each depth remembers its own last line, so coming back from a call does not repeat the caller's line.
     private func traceStep(_ fi: Int, _ code: Code, _ pc: Int) {
         let line = code.lines[pc]
         guard line > 0 else { return }
-        defer { traceFrames = frames.count; traceLine = line; tracePC = pc }
-        guard frames.count != traceFrames || line != traceLine || pc <= tracePC else { return }
+        let depth = min(frames.count, traceLine.count - 1)
+        defer { traceLine[depth] = line; tracePC[depth] = pc }
+        guard pc == 0 || line != traceLine[depth] || pc <= tracePC[depth] else { return }
         var vars: [(name: String, value: Value)] = []
         for (i, n) in code.localNames.enumerated() where i < frames[fi].locals.count {
             if let v = frames[fi].locals[i] { vars.append((n, v)) }

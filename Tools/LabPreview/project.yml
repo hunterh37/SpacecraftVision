@@ -1,0 +1,48 @@
+name: LabPreview
+options:
+  bundleIdPrefix: org.dicyaninlabs
+  deploymentTarget:
+    visionOS: "26.0"
+packages:
+  SpacecraftKit:
+    path: ../../Packages/SpacecraftKit
+targets:
+  LabPreview:
+    type: application
+    platform: visionOS
+    sources:
+      - path: Sources
+      - path: ../../VisionSpacecraft/Resources/Fonts
+        buildPhase: resources
+        optional: true
+    dependencies:
+      - package: SpacecraftKit
+        product: LabUI
+      - package: SpacecraftKit
+        product: FlightRunner
+      - package: SpacecraftKit
+        product: Curriculum
+      - package: SpacecraftKit
+        product: SpacecraftCore
+      - package: SpacecraftKit
+        product: FlightSim
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+        SWIFT_APPROACHABLE_CONCURRENCY: YES
+        PRODUCT_BUNDLE_IDENTIFIER: org.dicyaninlabs.labpreview
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: "Lab Preview"
+        CODE_SIGNING_ALLOWED: NO
+    info:
+      path: Info.plist
+      properties:
+        UIApplicationSceneManifest:
+          UIApplicationPreferredDefaultSceneSessionRole: UIWindowSceneSessionRoleApplication
+          UIApplicationSupportsMultipleScenes: false
+          UISceneConfigurations: {}
+        UIAppFonts:
+          - Polea-ExtraBold.otf
+          - Kregan.otf
+          - Nebula-Regular.otf

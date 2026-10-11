@@ -61,10 +61,20 @@ final class TraceRecorder {
                                calls: []))
     }
 
+    /// Compact text for call arguments and results: floats to 4 significant digits, tuples and lists element by element.
+    static func pretty(_ v: Value) -> String {
+        switch v {
+        case let .float(d) where d.isFinite && d != d.rounded(): return String(format: "%.4g", d)
+        case let .tuple(t): return "(" + t.map(pretty).joined(separator: ", ") + (t.count == 1 ? ",)" : ")")
+        case let .list(l): return "[" + l.items.prefix(12).map(pretty).joined(separator: ", ") + (l.items.count > 12 ? ", ..." : "") + "]"
+        default: return v.repr
+        }
+    }
+
     func call(_ name: String, _ args: [Value], _ result: Value) {
         guard !steps.isEmpty else { return }
-        let a = args.map { $0.repr }.joined(separator: ", ")
-        let r = result.repr
+        let a = args.map(Self.pretty).joined(separator: ", ")
+        let r = Self.pretty(result)
         steps[steps.count - 1].calls.append("craft.\(name)(\(a))" + (r == "None" ? "" : " -> \(r)"))
     }
 }

@@ -54,4 +54,11 @@ struct TracerTests {
         let counts = t.steps.filter { $0.line == 5 }.count
         #expect(counts == 3)
     }
+
+    @Test func returningFromACallDoesNotRepeatTheCallerLine() {
+        let src = "import craft\ndef f():\n    return 2\ndef update(dt):\n    y = f() + 1\n    z = y\n"
+        let t = FlightTracer.trace(source: src, craft: .rHop(), mission: l1.mission, atTime: 1)
+        #expect(t.steps.filter { $0.line == 5 }.count == 1)
+        #expect(t.steps.map(\.line) == [5, 3, 6] || t.steps.map(\.line) == [5, 3, 6, 6], "\(t.steps.map(\.line))")
+    }
 }

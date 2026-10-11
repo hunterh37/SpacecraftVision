@@ -1,6 +1,7 @@
 import SwiftUI
 import RealKit
 import RealLibrary
+import Curriculum
 
 @main
 struct VisionSpacecraftApp: App {
@@ -16,6 +17,7 @@ struct VisionSpacecraftApp: App {
         WindowGroup(id: WindowID.main) {
             HomeView()
                 .environment(model)
+                .modifier(DebugLaunch(model: model))
         }
         .defaultSize(width: 900, height: 700)
 
@@ -69,5 +71,20 @@ struct SpaceSwitcher {
 
     func close() async {
         if model.openSpace != nil { await dismiss(); model.openSpace = nil }
+    }
+}
+
+/// Debug builds only: `-debugLesson N` selects lesson N and opens the code window at launch, for simulator screenshots.
+private struct DebugLaunch: ViewModifier {
+    @Environment(\.openWindow) private var openWindow
+    let model: AppModel
+    func body(content: Content) -> some View {
+        content.task {
+            #if DEBUG
+            guard let raw = UserDefaults.standard.string(forKey: "debugLesson"), let n = Int(raw), Lesson.all.indices.contains(n) else { return }
+            model.select(lesson: Lesson.all[n])
+            openWindow(id: WindowID.code)
+            #endif
+        }
     }
 }

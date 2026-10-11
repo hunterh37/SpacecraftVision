@@ -28,6 +28,8 @@ targets:
         product: FlightRunner
       - package: SpacecraftKit
         product: Curriculum
+      - package: SpacecraftKit
+        product: LabUI
     settings:
       base:
         SWIFT_VERSION: "6.0"
@@ -44,6 +46,10 @@ targets:
       properties:
         CFBundleDisplayName: Vision Spacecraft
         ITSAppUsesNonExemptEncryption: false
+        UIAppFonts:
+          - Polea-ExtraBold.otf
+          - Kregan.otf
+          - Nebula-Regular.otf
         UIApplicationSceneManifest:
           UIApplicationPreferredDefaultSceneSessionRole: UIWindowSceneSessionRoleApplication
           UIApplicationSupportsMultipleScenes: true

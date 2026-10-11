@@ -2,6 +2,8 @@ import SwiftUI
 import FlightCode
 import FlightRunner
 import SpacecraftCore
+import Curriculum
+import LabUI
 
 /// Text-mode code editor (specs/05): monospaced source, compile status with line, preview summary,
 /// craft API reference, Run and Reset to starter.
@@ -17,7 +19,7 @@ struct CodeEditorView: View {
                     Text("\(model.mission.id) \(model.mission.title)").font(.title3.bold())
                     Text("Python").font(.caption).padding(.horizontal, 8).padding(.vertical, 3).background(.thinMaterial, in: Capsule())
                     Spacer()
-                    Button("Reset to starter", systemImage: "arrow.counterclockwise") { model.resetCode() }
+                    Button("Reset to starter", systemImage: "arrow.counterclockwise") { if let l = model.lesson { model.workspace(for: l).resetToStarter() } else { model.resetCode() } }
                     Button("Run", systemImage: "play.fill") {
                         Task {
                             await SpaceSwitcher(model: model, open: openSpace, dismiss: dismissSpace).show(.range)
@@ -37,31 +39,10 @@ struct CodeEditorView: View {
         .onAppear { model.codeOpened = true }
     }
 
-    var editor: some View {
-        HStack(alignment: .top, spacing: 0) {
-            let lines = model.source.components(separatedBy: "\n").count
-            let errLine: Int? = { if case let .error(e) = model.compileStatus { return e.line }; return nil }()
-            ScrollView {
-                HStack(alignment: .top, spacing: 0) {
-                    VStack(alignment: .trailing, spacing: 0) {
-                        ForEach(1...max(lines, 1), id: \.self) { n in
-                            Text("\(n)")
-                                .font(.system(size: 15, design: .monospaced))
-                                .foregroundStyle(n == errLine ? .red : .secondary)
-                                .frame(height: 19.5)
-                        }
-                    }
-                    .padding(.top, 8)
-                    .padding(.trailing, 8)
-                    TextEditor(text: Binding(get: { model.source }, set: { model.source = $0 }))
-                        .font(.system(size: 15, design: .monospaced))
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                        .scrollDisabled(true)
-                        .frame(minHeight: CGFloat(lines) * 19.5 + 40)
-                }
-            }
-            .background(.black.opacity(0.25), in: RoundedRectangle(cornerRadius: 12))
+    @ViewBuilder var editor: some View {
+        if let lesson = model.lesson {
+            CodeWorkspace(model: model.workspace(for: lesson), errorLine: model.codeProblem?.line, errorText: model.codeProblem?.text,
+                          flightDuration: model.preview?.result.duration ?? 30)
         }
     }
 
