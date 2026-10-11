@@ -363,7 +363,11 @@ public final class FlightSimulation {
 
     public func setThrottle(_ x: Double) { throttleCommand = min(max(x, 0), 1) }
     public func setPitchRate(_ r: Double) { let l = isAircraft ? 0.6 : 0.5; rateCommand.x = min(max(r, -l), l) }
-    public func setYawRate(_ r: Double) { let l = isAircraft ? 0.25 : 0.5; rateCommand.y = min(max(r, -l), l) }
+    public func setYawRate(_ r: Double) {
+        // Aircraft: heading rate limited by a 45 deg bank, g tan(45) / v (0.28 rad/s at 35 m/s).
+        let l = isAircraft ? g0 / max(simd_len(velocity), 20) : 0.5
+        rateCommand.y = min(max(r, -l), l)
+    }
     public func setRollRate(_ r: Double) { let l = isAircraft ? 1.5 : 1.0; rateCommand.z = min(max(r, -l), l) }
     public func log(_ s: String) { lastLog = s }
     public func plot(_ name: String, _ v: Double) {
