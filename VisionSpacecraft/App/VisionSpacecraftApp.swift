@@ -8,6 +8,7 @@ struct VisionSpacecraftApp: App {
     @State private var model = AppModel()
     @State private var workshopStyle: ImmersionStyle = .full
     @State private var rangeStyle: ImmersionStyle = .full
+    @State private var spaceStyle: ImmersionStyle = .full
 
     init() {
         RealityHD.setup(.balanced)
@@ -50,6 +51,12 @@ struct VisionSpacecraftApp: App {
                 .environment(model)
         }
         .immersionStyle(selection: $rangeStyle, in: .full)
+
+        ImmersiveSpace(id: SpaceID.space.rawValue) {
+            SpaceImmersiveView()
+                .environment(model)
+        }
+        .immersionStyle(selection: $spaceStyle, in: .full)
     }
 }
 
@@ -77,10 +84,22 @@ struct SpaceSwitcher {
 /// Debug builds only: `-debugLesson N` selects lesson N and opens the code window at launch, for simulator screenshots.
 private struct DebugLaunch: ViewModifier {
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openImmersiveSpace) private var openSpace
+    @Environment(\.dismissImmersiveSpace) private var dismissSpace
     let model: AppModel
     func body(content: Content) -> some View {
         content.task {
             #if DEBUG
+            // -debugSpace N [-debugCode ref|starter] [-debugLaunch 1]: open the space scene on lesson N, optionally flying it at 8x.
+            if let raw = UserDefaults.standard.string(forKey: "debugSpace"), let n = Int(raw), Lesson.all.indices.contains(n) {
+                let l = Lesson.all[n]
+                model.select(lesson: l)
+                model.source = UserDefaults.standard.string(forKey: "debugCode") == "starter" ? l.starterCode : l.referenceCode
+                try? await Task.sleep(for: .seconds(2))
+                await SpaceSwitcher(model: model, open: openSpace, dismiss: dismissSpace).show(.space)
+                if UserDefaults.standard.string(forKey: "debugLaunch") == "1" { try? await Task.sleep(for: .seconds(2)); model.flight.timeScale = 8; model.launch() }
+                return
+            }
             guard let raw = UserDefaults.standard.string(forKey: "debugLesson"), let n = Int(raw), Lesson.all.indices.contains(n) else { return }
             model.select(lesson: Lesson.all[n])
             openWindow(id: WindowID.code)

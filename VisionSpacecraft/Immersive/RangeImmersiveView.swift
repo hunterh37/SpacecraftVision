@@ -34,6 +34,11 @@ struct RangeImmersiveView: View {
                     hud.addChild(callout)
                     scene.callout = callout
                 }
+                if let btn = attachments.entity(for: "spaceBtn") {
+                    btn.position = [0.62, 0.04, 0.03]
+                    btn.orientation = simd_quatf(angle: -0.3, axis: [0, 1, 0])
+                    hud.addChild(btn)
+                }
             }
             content.add(scene.indicators.world)
             await scene.buildStatic(course: model.mission.course)
@@ -51,6 +56,10 @@ struct RangeImmersiveView: View {
                 FlightHUDView()
                     .environment(model)
             }
+            Attachment(id: "spaceBtn") {
+                SpaceViewButton()
+                    .environment(model)
+            }
             Attachment(id: "callout") {
                 CalloutView()
                     .environment(model)
@@ -66,6 +75,7 @@ struct RangeImmersiveView: View {
         .onChange(of: model.flight.launchID) { scene.resetCraftPose() }
         .onChange(of: model.walkthrough.successCount) { scene.playSuccess() }
         .onAppear { model.walkthrough.startIfNeeded() }
+        .modifier(FollowToSpace())
     }
 
     struct RibbonKey: Hashable { var n: Int; var t: Double; var view: FlightView }
