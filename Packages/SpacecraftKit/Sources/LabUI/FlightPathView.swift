@@ -221,7 +221,15 @@ public struct FlightPathView: View {
         }
         let gp = P(course.goal)
         ctx.stroke(Path(ellipseIn: CGRect(x: gp.x - 7, y: gp.y - 7, width: 14, height: 14)), with: .color(Brand.ignition), style: StrokeStyle(lineWidth: 1.5, dash: [3, 2]))
-        ctx.draw(Text("GOAL").font(Brand.label(8.5)).foregroundStyle(Brand.ignition), at: CGPoint(x: gp.x + 10, y: gp.y), anchor: .leading)
+        let eventBesideGoal = events.contains { event in
+            guard let i = samples.index(atTime: event.time) else { return false }
+            let ep = P(samples[i].position)
+            return abs(ep.x - gp.x) < 80 && abs(ep.y - gp.y) < 18
+        }
+        let labelOnLeft = eventBesideGoal && gp.x > 55
+        ctx.draw(Text("GOAL").font(Brand.label(8.5)).foregroundStyle(Brand.ignition),
+                 at: CGPoint(x: gp.x + (labelOnLeft ? -10 : 10), y: gp.y),
+                 anchor: labelOnLeft ? .trailing : .leading)
     }
 
     // MARK: time strip
