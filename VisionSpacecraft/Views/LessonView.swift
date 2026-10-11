@@ -61,8 +61,7 @@ struct LessonView: View {
     private var launchStage: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 14) {
-                FlightPathView(report: model.preview.flatMap { $0.compileError == nil ? $0 : nil }, course: lesson.mission.course, live: model.liveFlight,
-                               cursor: $cursor, height: 260)
+                LiveFlightPath(course: lesson.mission.course, cursor: $cursor, height: 260)
                 Text("Goal: \(goalText)").font(.system(size: 14, weight: .medium)).foregroundStyle(Brand.dim)
             }
             .padding(20).labCard(corner: 26, tint: Brand.telemetry, aurora: 0.2)
@@ -199,5 +198,17 @@ struct LessonView: View {
         case .gates: "pass the gates in order, then cross the finish"
         case .climb, .capstone: "climb inside the corridor, then cross the finish"
         }
+    }
+}
+
+/// Path graph that reads the per-frame live flight itself, so only this view redraws during a launch.
+struct LiveFlightPath: View {
+    let course: Course
+    @Binding var cursor: Double
+    let height: CGFloat
+    @Environment(AppModel.self) private var model
+    var body: some View {
+        FlightPathView(report: model.preview.flatMap { $0.compileError == nil ? $0 : nil }, course: course, live: model.liveFlight,
+                       cursor: $cursor, height: height)
     }
 }

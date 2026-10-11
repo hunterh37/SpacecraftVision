@@ -115,7 +115,13 @@ struct WorkshopImmersiveView: View {
                 let a = model.assembly
                 guard a.active, let plan = a.plan, let i = AssemblyStage.rackIndex(of: v.entity) else { return }
                 // Grabbing a rack part during Watch build or Show me hands control to the player.
-                if a.mode == .watch || a.showMe { a.takeOver() }
+                // Ignore pinches/taps (e.g. the Watch build button) that land on a rack part; take over only on a real lift.
+                if a.mode == .watch || a.showMe {
+                    let moved = simd_distance(v.convert(v.location3D, from: .local, to: .scene),
+                                              v.convert(v.startLocation3D, from: .local, to: .scene))
+                    guard held == i || moved > 0.04 else { return }
+                    if held != i { a.takeOver() }
+                }
                 held = i
                 let hand = v.convert(v.location3D, from: .local, to: .scene)
                 let heavy = plan.steps[i].instance.definition.length > 2
@@ -164,9 +170,12 @@ struct WorkshopImmersiveView: View {
             .onEnded { v in
                 guard let lp = v.entity.components[LoosePartComponent.self] else { return }
                 let p = v.entity.position(relativeTo: nil)
-                if abs(p.x) < 3, p.z > -6, p.z < 0 { model.addPart(lp.partId) }
-                v.entity.move(to: Transform(scale: v.entity.scale, rotation: v.entity.orientation, translation: lp.home),
-                              relativeTo: v.entity.parent, duration: 0.4)
+                // Dropped near the craft: add to stack and return to stand. Elsewhere: stay where dropped.
+                if abs(p.x) < 3, p.z > -6, p.z < 0 {
+                    model.addPart(lp.partId)
+                    v.entity.move(to: Transform(scale: v.entity.scale, rotation: v.entity.orientation, translation: lp.home),
+                                  relativeTo: v.entity.parent, duration: 0.4)
+                }
             })
         .task(id: CraftKey(craft: model.craft, sel: model.selectedStackPart, table: model.workshopTabletop)) {
             let e = await CraftBuilder.build(model.craft, markers: true, highlight: model.selectedStackPart)

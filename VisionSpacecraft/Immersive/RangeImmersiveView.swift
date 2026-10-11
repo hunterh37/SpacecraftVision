@@ -89,7 +89,10 @@ struct RangeImmersiveView: View {
         }
         .onChange(of: model.flight.launchID) { scene.resetCraftPose(); scene.resetGates(); scene.audio.cue("launch") }
         .onChange(of: model.flight.phase) { _, p in
-            if p == .finished { scene.audio.cue(model.flight.sim?.result?.passed == true ? "pass" : "fail") }
+            if p == .finished {
+                let r = model.flight.sim?.result
+                scene.audio.cue(r?.passed == true ? "pass" : CrashEffects.destroys(r?.failure?.key) ? "explosion" : "fail")
+            }
         }
         .onChange(of: model.flight.gates) { _, n in scene.markGatePassed(n) }
         .onChange(of: model.walkthrough.successCount) { scene.playSuccess() }
@@ -134,6 +137,8 @@ final class RangeScene {
     var windsock: Entity?
     let props = CourseProps()
     let audio = FlightAudio()
+    let crash = CrashEffects()
+    private var crashed = false
     let vignette = ComfortVignette()
     private var lastViewDir: SIMD3<Float>?
 
@@ -173,6 +178,7 @@ final class RangeScene {
         root.addChild(props.root)
         root.addChild(ribbonHolder)
         root.addChild(craftHolder)
+        root.addChild(crash.root)
         root.addChild(indicators.course)
     }
 
@@ -374,10 +380,12 @@ final class RangeScene {
         craftHolder.orientation = simd_quatf(angle: 0, axis: [0, 1, 0])
         plume?.isEnabled = false; drogue?.isEnabled = false; mainChute?.isEnabled = false
         poser?.reset()
+        crashed = false; crash.reset(); craftModel?.isEnabled = true
     }
 
     func updateCraft(_ f: FlightController, view: FlightView, course: Course, dt: Double = 1.0 / 90) {
-        guard f.phase != .idle else { return }
+        crash.update(dt: Float(dt))
+        guard f.phase != .idle, !crashed else { return }
         let com = Float(craftModel.map { -$0.position.y } ?? 2)
         craftHolder.position = rk(f.position) + [0, com, 0]
         let nose = Vec3(cos(f.pitch) * sin(f.yaw), cos(f.pitch) * cos(f.yaw), sin(f.pitch))
@@ -403,6 +411,15 @@ final class RangeScene {
             vignette.update(rateDegPerSec: 0, dt: Float(dt))
         }
         lastViewDir = dir
+        if f.phase == .finished, CrashEffects.destroys(f.sim?.result?.failure?.key) {
+            crashed = true
+            let length = Float(max(1, -(craftModel?.position.y ?? -2) * 2))
+            crash.trigger(at: rk(f.position), scale: length / 6)
+            craftModel?.isEnabled = false; plume?.isEnabled = false
+            drogue?.isEnabled = false; mainChute?.isEnabled = false
+            audio.update(throttle: 0, dynamicPressure: 0, propeller: false, chase: view == .chase, flying: false)
+            return
+        }
         if let plume {
             plume.isEnabled = f.throttle > 0 && f.phase != .finished
             plume.scale = [1, Float(0.4 + f.throttle), 1]

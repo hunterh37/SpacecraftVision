@@ -174,7 +174,7 @@ final class AssemblyStage {
         let pos = e.position(relativeTo: nil)
         if grabOffset == nil { grabOffset = pos - hand }
         let want = hand + (grabOffset ?? .zero)
-        let next = heavy ? pos + (want - pos) * 0.35 : want
+        let next = heavy ? pos + (want - pos) * 0.75 : want
         guard let target else { e.setPosition(next, relativeTo: nil); return .free }
         let radius = max(0.6 * target.scale.x, 0.12)
         let near = simd_distance(next, target.translation) < radius
@@ -192,9 +192,8 @@ final class AssemblyStage {
 
     func release(_ i: Int) {
         grabOffset = nil
-        if !snapped, let e = entity(i), let home = homes[i] {
-            e.move(to: home, relativeTo: rack, duration: 0.4, timingFunction: .easeInOut)
-        }
+        // Unsnapped parts stay where dropped; rebuild() restores rack homes on the next step.
+        _ = i
     }
 
     // MARK: Watch

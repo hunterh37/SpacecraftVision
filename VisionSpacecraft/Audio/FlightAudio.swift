@@ -46,6 +46,8 @@ final class FlightAudio {
             if let url = Self.wav("cue-\(name)", { Self.tone(hz: f, seconds: d, glide: name == "pass" ? 1.5 : name == "fail" ? 0.6 : 1) }),
                let res = try? AudioFileResource.load(contentsOf: url) { cues[name] = res }
         }
+        if let url = Self.wav("cue-explosion", { Self.explosion(seconds: 2.5) }),
+           let res = try? AudioFileResource.load(contentsOf: url) { cues["explosion"] = res }
         for c in [roar, crackle, prop, wind] { c?.gain = -80; c?.play() }
     }
 
@@ -129,6 +131,21 @@ final class FlightAudio {
             let t = Double(i) / rate
             let p = (t * hz).truncatingRemainder(dividingBy: 1)
             return Float((2 * p - 1) * 0.35 + sin(2 * .pi * hz * 3 * t) * 0.15)
+        }
+    }
+
+    /// Low-passed noise burst with a sub thump and exponential decay.
+    static func explosion(seconds: Double) -> [Float] {
+        let n = Int(seconds * rate)
+        var g = SystemRandomNumberGenerator(), lp = 0.0, lp2 = 0.0
+        return (0..<n).map { i in
+            let t = Double(i) / rate
+            let w = Double.random(in: -1...1, using: &g)
+            let k = 0.02 + 0.25 * exp(-t * 6)          // filter opens at the blast, closes into rumble
+            lp += (w - lp) * k; lp2 += (lp - lp2) * k
+            let thump = sin(2 * .pi * 45 * t * (1 - t * 0.3)) * exp(-t * 5)
+            let env = min(1, t * 400) * exp(-t * 1.6)
+            return Float(max(-1, min(1, (lp2 * 3.2 + thump * 0.7) * env)))
         }
     }
 

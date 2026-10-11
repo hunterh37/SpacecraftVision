@@ -17,6 +17,7 @@ struct LessonDeckView: View {
     @State private var placed: [String] = []
     @State private var checkResult: Bool?
     @State private var picking = false
+    @State private var demos = false
     @State private var pathCursor = 3.0
 
     private var lesson: Lesson { model.lesson ?? Lesson.all[0] }
@@ -25,7 +26,7 @@ struct LessonDeckView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             header
-            if picking { picker } else {
+            if picking { picker } else if demos { LessonDemoPanel(lesson: lesson) { demos = false } } else {
                 stagePicker
                 if stage.rawValue >= LessonStage.implement.rawValue { pathPanel }
                 content.frame(maxWidth: .infinity, alignment: .leading).font(Lab.soft(17))
@@ -39,11 +40,12 @@ struct LessonDeckView: View {
         .animation(.spring(duration: 0.3), value: stage)
         .animation(.spring(duration: 0.3), value: line)
         .animation(.spring(duration: 0.3), value: picking)
+        .animation(.spring(duration: 0.3), value: demos)
         .onAppear { reset() }
-        .onChange(of: model.lesson?.id) { reset() }
+        .onChange(of: model.lesson?.id) { demos = false; reset() }
         .onChange(of: stage) { old, new in if new == .implement && old == .pseudocode && lesson.blockProgram == nil { openCode() } }
         .onChange(of: model.flight.phase) { _, p in
-            if p == .finished, stage == .run, model.lastReport != nil { model.lessonStage = .analyze }
+            if p == .finished, !demos, stage == .run, model.lastReport != nil { model.lessonStage = .analyze }
         }
     }
 
@@ -59,6 +61,9 @@ struct LessonDeckView: View {
             }
             .buttonStyle(.plain)
             Spacer()
+            Button { demos.toggle(); picking = false } label: { Label("Demos", systemImage: demos ? "play.square.fill" : "play.square") }
+                .buttonStyle(LabSecondaryButtonStyle(tint: demos ? Brand.ignition : Brand.telemetry))
+                .accessibilityLabel("Demo scenarios")
             Button { Task { await exit() } } label: { Image(systemName: "xmark") }
                 .buttonStyle(LabIconButton())
                 .accessibilityLabel("Exit Learn")
@@ -98,8 +103,7 @@ struct LessonDeckView: View {
 
     /// The trajectory of the rocket: the simulator's forecast of the current code, the rocket at the cursor, and the real rocket live.
     private var pathPanel: some View {
-        FlightPathView(report: model.preview.flatMap { $0.compileError == nil ? $0 : nil }, course: lesson.mission.course,
-                       live: model.liveFlight, cursor: $pathCursor, height: 120)
+        LiveFlightPath(course: lesson.mission.course, cursor: $pathCursor, height: 120)
             .padding(14)
             .labCard(corner: 22, tint: Brand.telemetry, aurora: 0.12)
     }
