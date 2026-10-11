@@ -37,6 +37,29 @@ Supported: `int`, `double`, `bool`, fixed arrays, structs, functions, `if`, `for
 array parameters; no `malloc`. Static types are checked; errors use gcc-style messages with line
 and column.
 
+Implementation: `FlightCode/CCompiler.swift` type-checks C and lowers it to the Python-subset syntax
+tree, then the shared generator emits the same bytecode for the same VM (`Compiler.compile(source,
+language: .c)`, `ScriptGuidance(source:language:)`). Errors read `line:col: error: message`.
+
+`<craft.h>` mapping (one function per craft call, `vec3` is `struct { double x, y, z; }`):
+
+| C | Python |
+|---|---|
+| `double craft_altitude()`, `craft_fuel`, `craft_energy`, `craft_time`, `craft_mass`, `craft_thrust_max`, `craft_random`, `craft_temperature` | `craft.altitude()` ... |
+| `vec3 craft_position()`, `craft_velocity`, `craft_attitude` (x pitch, y yaw, z roll), `craft_next_gate` / `craft_goal` (x bearing, y elevation, z distance), `craft_goal_position` | tuple results |
+| `void craft_set_throttle(double)`, `craft_set_pitch`, `craft_set_yaw`, `craft_set_roll`, `craft_stage(void)` | commands |
+| `void craft_log(x)`, `void craft_plot("name", double)` | string literals only here |
+| `double craft_lidar(double angle_deg)` | `craft.lidar(a)` |
+| `int craft_lidar_scan(double angles[], double dists[])` | fills both arrays (36 entries), returns the count; only as a statement or assignment right side |
+
+`craft_radar`, `craft_radar_tracks` and `craft_camera_objects` are Python only in v1.
+`<math.h>`: `sin cos tan asin acos atan atan2 sqrt hypot exp log floor ceil fabs copysign pow fmin
+fmax`, `M_PI`, `INFINITY`, plus the craft helpers `radians`, `degrees`, `clamp(x, lo, hi)`.
+Semantics: `int / int` and `%` truncate toward zero; struct and array assignment shares storage
+(no copy); `continue` inside `switch` and assignment inside expressions are rejected. Lesson 0 and 1
+C references: `Curriculum/LessonCodeC.swift`, checked against the Python command streams in
+`FlightRunnerTests/CLessonTests.swift`.
+
 ## Program contract
 
 Both languages expose the same entry points:

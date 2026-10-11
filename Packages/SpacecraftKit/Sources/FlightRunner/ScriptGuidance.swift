@@ -27,8 +27,8 @@ public final class ScriptGuidance: FlightGuidance, VMHost {
     private var started = false
     private var startTime = 0.0
 
-    public init(source: String) throws {
-        program = try Compiler.compile(source)
+    public init(source: String, language: SourceLanguage = .python) throws {
+        program = try Compiler.compile(source, language: language)
         vm = VM(program: program, host: nil)
         vm.host = self
     }

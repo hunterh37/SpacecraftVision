@@ -27,6 +27,10 @@ indirect enum Stmt {
     case ret(Expr?)
     case breakS, continueS, pass
     case importS(String)
+    /// C front end: function with an explicit local list (params first), so globals stay global.
+    case cdef(String, [String], [String], [Node<Stmt>])
+    /// C front end: loop whose `continue` runs `step` before re-testing `cond`.
+    case cfor(Expr, [Node<Stmt>], [Node<Stmt>])
 }
 
 typealias SNode = Node<Stmt>

@@ -67,7 +67,7 @@ struct Gen {
     let prog: Program
     let code: Code
     var locals: [String: Int]?           // nil at module level
-    var loops: [(isFor: Bool, continueTarget: Int, breaks: [Int])] = []
+    var loops: [(isFor: Bool, continueTarget: Int, breaks: [Int], continues: [Int])] = []
     var line = 1
 
     init(prog: Program, code: Code, locals: [String: Int]?) {
@@ -155,7 +155,7 @@ struct Gen {
             let start = here
             try expr(cond)
             let jf = here; emit(.jumpIfFalse(-1))
-            loops.append((false, start, []))
+            loops.append((false, start, [], []))
             try block(body)
             emit(.jump(start))
             let l = loops.removeLast()
@@ -169,7 +169,7 @@ struct Gen {
             if names.count == 1 { store(names[0]) } else {
                 emit(.unpack(names.count)); for n in names { store(n) }
             }
-            loops.append((true, top, []))
+            loops.append((true, top, [], []))
             try block(body)
             emit(.jump(top))
             let l = loops.removeLast()
@@ -200,6 +200,36 @@ struct Gen {
             g.emitConst(.none, line: 0); g.emit(.ret, line: 0)      // implicit return: not a source line, never traced
             emit(.makeFunction(fi))
             store(name)
+        case let .cdef(name, params, localNames, body):
+            guard locals == nil else { throw CompileError("Nested functions are not supported", line: line) }
+            let fcode = Code(name: name, params: params.count)
+            var map: [String: Int] = [:]
+            for p in params + localNames where map[p] == nil { map[p] = map.count }
+            fcode.nlocals = map.count
+            fcode.localNames = map.sorted { $0.value < $1.value }.map(\.key)
+            prog.functions.append(fcode)
+            let fi = prog.functions.count - 1
+            prog.functionNames.append(name)
+            var g = Gen(prog: prog, code: fcode, locals: map)
+            g.line = line
+            try g.block(body)
+            g.emitConst(.none, line: 0); g.emit(.ret, line: 0)
+            emit(.makeFunction(fi))
+            store(name)
+        case let .cfor(cond, body, step):
+            let start = here
+            try expr(cond)
+            let jf = here; emit(.jumpIfFalse(-1))
+            loops.append((false, -1, [], []))
+            try block(body)
+            let stepAt = here
+            for c in loops[loops.count - 1].continues { patch(c, to: stepAt) }
+            loops[loops.count - 1].continues = []
+            try block(step)
+            emit(.jump(start))
+            let l = loops.removeLast()
+            patch(jf, to: here)
+            for b in l.breaks { patch(b, to: here) }
         case let .ret(e):
             guard locals != nil else { throw CompileError("'return' outside function", line: line) }
             if let e { try expr(e) } else { emitConst(.none) }
@@ -209,7 +239,9 @@ struct Gen {
             loops[loops.count - 1].breaks.append(here); emit(.jump(-1))
         case .continueS:
             guard let l = loops.last else { throw CompileError("'continue' outside loop", line: line) }
-            emit(.jump(l.continueTarget))
+            if l.continueTarget >= 0 { emit(.jump(l.continueTarget)) } else {
+                loops[loops.count - 1].continues.append(here); emit(.jump(-1))
+            }
         case .pass: break
         case let .importS(m):
             emitConst(.module(m)); store(m)
