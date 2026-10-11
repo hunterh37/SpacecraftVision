@@ -65,7 +65,14 @@ public struct AssemblyPlan: Sendable, Hashable {
             let n = max(1, step.instance.count)
             let y = step.partId == "fin-trapezoid" ? span.bottom : (span.bottom + span.top) / 2 - 0.1
             let r = dia / 2 + (step.partId == "fin-trapezoid" ? 0 : 0.05)
-            if n > 1 { return (y, r, (0..<n).map { Double($0) / Double(n) * 2 * .pi + .pi / 4 }) }
+            if n > 1 {
+                // Split into typed steps: the one-line form exceeds the type checker's limit on Swift 6.2.4.
+                let angles: [Double] = (0..<n).map { (k: Int) -> Double in
+                    let fraction: Double = Double(k) / Double(n)
+                    return fraction * 2.0 * Double.pi + Double.pi / 4.0
+                }
+                return (y, r, angles)
+            }
             // Single radial parts fan out around their parent in mount order.
             let slot = target.radial.filter { $0.parentId == parent && $0.count <= 1 }.firstIndex { $0.id == step.id } ?? 0
             return (y, r, [Double(slot) * 1.1 + 0.4])
