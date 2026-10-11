@@ -19,6 +19,8 @@ public struct Gate: Codable, Sendable, Hashable, Identifiable {
 public enum Corridor: Codable, Sendable, Hashable {
     case tube(from: Vec3, to: Vec3, radius: Double)
     case box(from: Vec3, to: Vec3, halfWidth: Double, floor: Double, ceiling: Double, floorGrace: Double)
+    /// Plan-view polyline with half width, floor and ceiling (canyon courses).
+    case path(points: [Vec3], halfWidth: Double, floor: Double, ceiling: Double, floorGrace: Double)
 
     /// Whether a point is inside at time t.
     public func contains(_ p: Vec3, time t: Double) -> Bool {
@@ -31,10 +33,24 @@ public enum Corridor: Codable, Sendable, Hashable {
             if p.z > ceiling { return false }
             if t > grace && p.z < floor { return false }
             return true
+        case let .path(points, hw, floor, ceiling, grace):
+            if Corridor.polylineDistance2D(p, points) > hw { return false }
+            if p.z > ceiling { return false }
+            if t > grace && p.z < floor { return false }
+            return true
         }
     }
 
-    static func segmentDistance(_ p: Vec3, _ a: Vec3, _ b: Vec3) -> Double {
+    public static func polylineDistance2D(_ p: Vec3, _ pts: [Vec3]) -> Double {
+        let p2 = Vec3(p.x, p.y, 0)
+        var best = Double.infinity
+        for (a, b) in zip(pts, pts.dropFirst()) {
+            best = min(best, segmentDistance(p2, Vec3(a.x, a.y, 0), Vec3(b.x, b.y, 0)))
+        }
+        return best
+    }
+
+    public static func segmentDistance(_ p: Vec3, _ a: Vec3, _ b: Vec3) -> Double {
         let ab = b - a, l2 = simd_dot_d(ab, ab)
         let t = l2 > 0 ? min(max(simd_dot_d(p - a, ab) / l2, 0), 1) : 0
         let q = a + ab * t
@@ -78,6 +94,23 @@ public struct Course: Codable, Sendable, Hashable, Identifiable {
     public var wind: Wind
     public var timeOfDay: TimeOfDay
     public var goal: Vec3
+    /// Pad start (rockets) or air start (aircraft).
+    public var start: CraftStart = .pad
+    /// Static and moving obstacles (specs/15); canyon walls are `canyon`.
+    public var obstacles: [Obstacle] = []
+    public var canyon: Canyon?
+    /// Finish plane z = finishZ (debris climb); nil when unused.
+    public var finishZ: Double?
+    /// Generator seed for C7 courses.
+    public var seed: UInt64?
+
+    public init(id: String, extent: Vec3, corridor: Corridor, gates: [Gate], finishY: Double?, landingZone: LandingZone?,
+                wind: Wind, timeOfDay: TimeOfDay, goal: Vec3, start: CraftStart = .pad, obstacles: [Obstacle] = [],
+                canyon: Canyon? = nil, finishZ: Double? = nil, seed: UInt64? = nil) {
+        self.id = id; self.extent = extent; self.corridor = corridor; self.gates = gates; self.finishY = finishY
+        self.landingZone = landingZone; self.wind = wind; self.timeOfDay = timeOfDay; self.goal = goal; self.start = start
+        self.obstacles = obstacles; self.canyon = canyon; self.finishZ = finishZ; self.seed = seed
+    }
 
     public static let c1 = Course(id: "C1", extent: Vec3(1000, 1000, 1600),
                                   corridor: .tube(from: .zero, to: Vec3(0, 0, 1500), radius: 400), gates: [], finishY: nil,
@@ -98,8 +131,12 @@ public struct Course: Codable, Sendable, Hashable, Identifiable {
                                           Gate("G5", Vec3(0, 1000, 300), r: 12)],
                                   finishY: 1100, landingZone: nil, wind: .calm, timeOfDay: .afternoon,
                                   goal: Vec3(0, 1100, 300))
-    public static let all = [c1, c1w, c2]
-    public static func named(_ id: String) -> Course? { all.first { $0.id == id } }
+    public static let all = [c1, c1w, c2, c2b, c3, c4, c5, c6]
+    public static func named(_ id: String) -> Course? {
+        if let c = all.first(where: { $0.id == id }) { return c }
+        if id.hasPrefix("C7-"), let s = UInt64(id.dropFirst(3)) { return CourseGenerator.c7(seed: s) }
+        return nil
+    }
 }
 
 public enum MissionGoal: Codable, Sendable, Hashable {
@@ -107,6 +144,10 @@ public enum MissionGoal: Codable, Sendable, Hashable {
     case hop(apogeeMin: Double, apogeeMax: Double, pitchRMSDeg: Double?)
     /// All gates in order and finish crossed.
     case gates
+    /// Reach the finish plane z = course.finishZ inside the corridor.
+    case climb
+    /// Finish gate passed; scored on energy and time (lesson 10).
+    case capstone
 }
 
 public struct Mission: Codable, Sendable, Hashable, Identifiable {
@@ -150,9 +191,45 @@ public struct Mission: Codable, Sendable, Hashable, Identifiable {
     public static let m2 = Mission(id: "M2", title: "Gates", lesson: 2, courseId: "C2", payloadMass: 20, massCap: 1_600,
                                    partCap: 16, budget: 26_000, energyCap: 2_500, fixedFuelLoad: nil,
                                    allowedParts: m1Parts + ["fuel-tank-m", "decoupler"], goal: .gates,
-                                   parFuel: 330, parClearance: 6)
-    public static let all = [m1, m1w, m1t, m1p, m2]
-    public static func named(_ id: String) -> Mission? { all.first { $0.id == id } }
+                                   parFuel: 380, parClearance: 6)
+    static let m2bParts = m1Parts + ["fuel-tank-m", "decoupler", "lidar-sensor"]
+    static let aircraftParts = ["probe-core", "imu", "battery-pack", "nose-cone", "fuselage-section", "engine-prop", "wing-section",
+                                "elevon", "fin-trapezoid", "landing-gear", "solar-panel", "lidar-sensor"]
+
+    public static let m2b = Mission(id: "M2B", title: "Gates and walls", lesson: 3, courseId: "C2B", payloadMass: 20, massCap: 1_600,
+                                    partCap: 16, budget: 30_000, energyCap: 2_500, fixedFuelLoad: nil, allowedParts: m2bParts,
+                                    goal: .gates, parFuel: 220, parClearance: 5)
+    public static let m3 = Mission(id: "M3", title: "Drift", lesson: nil, courseId: "C3", payloadMass: 20, massCap: 1_600,
+                                   partCap: 16, budget: 26_000, energyCap: 2_500, fixedFuelLoad: nil,
+                                   allowedParts: m1Parts + ["fuel-tank-m", "decoupler"], goal: .gates, parFuel: 380, parClearance: 6)
+    /// Aircraft missions: `parFuel` is energy in Wh (specs/15 C4 par).
+    public static let m4 = Mission(id: "M4", title: "Field", lesson: 4, courseId: "C4", payloadMass: 20, massCap: 600, partCap: 18,
+                                   budget: 28_000, energyCap: 5_000, fixedFuelLoad: nil, allowedParts: aircraftParts, goal: .gates,
+                                   parFuel: 600, parClearance: 25)
+    public static let m5 = Mission(id: "M5", title: "Canyon", lesson: 6, courseId: "C5", payloadMass: 20, massCap: 600, partCap: 18,
+                                   budget: 28_000, energyCap: 5_000, fixedFuelLoad: nil, allowedParts: aircraftParts, goal: .gates,
+                                   parFuel: 900, parClearance: 20)
+    public static let m6 = Mission(id: "M6", title: "Debris", lesson: 7, courseId: "C6", payloadMass: 50, massCap: 3_600, partCap: 20,
+                                   budget: 34_000, energyCap: 2_500, fixedFuelLoad: nil,
+                                   allowedParts: m2bParts + ["fuel-tank-l", "engine-solid-small", "radar-sensor", "camera-sensor"],
+                                   goal: .climb, parFuel: 1_500, parClearance: 40)
+
+    /// Capstone on generated course `C7-<seed>`.
+    public static func m7(seed: UInt64) -> Mission {
+        Mission(id: "M7-\(seed)", title: "Capstone", lesson: 10, courseId: "C7-\(seed)", payloadMass: 40, massCap: 650, partCap: 20,
+                budget: 40_000, energyCap: 7_500, fixedFuelLoad: nil, allowedParts: aircraftParts + ["camera-sensor", "radar-sensor"],
+                goal: .capstone, parFuel: 0, parClearance: nil)
+    }
+
+    /// True for missions flown by an aircraft (air start).
+    public var isAircraft: Bool { course.start.isAir }
+
+    public static let all = [m1, m1w, m1t, m1p, m2, m2b, m3, m4, m5, m6]
+    public static func named(_ id: String) -> Mission? {
+        if let m = all.first(where: { $0.id == id }) { return m }
+        if id.hasPrefix("M7-"), let s = UInt64(id.dropFirst(3)) { return m7(seed: s) }
+        return nil
+    }
 }
 
 /// A launch blocker found in the workshop (specs/07 hard constraints).

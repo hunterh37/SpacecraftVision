@@ -101,13 +101,15 @@ public final class ScriptGuidance: FlightGuidance, VMHost {
     func craftCallInner(_ name: String, _ args: [Value]) throws -> Value {
         guard let sim else { throw VMFault(.name, "craft is not connected") }
         switch name {
-        case "position": return .vec(sim.position.x, sim.position.y, sim.position.z)
-        case "velocity": return .vec(sim.velocity.x, sim.velocity.y, sim.velocity.z)
-        case "attitude": return .vec(sim.pitch, sim.yaw, sim.roll)
-        case "altitude": return .float(sim.altitude)
+        case "position": let p = sim.sensedPosition; return .vec(p.x, p.y, p.z)
+        case "velocity": let v = sim.sensedVelocity; return .vec(v.x, v.y, v.z)
+        case "attitude": let a = sim.sensedAttitude; return .vec(a.x, a.y, a.z)
+        case "altitude": return .float(sim.sensedPosition.z)
         case "fuel": return .float(sim.fuelFraction)
         case "energy": return .float(sim.energyFraction)
-        case "temperature": return .float(sim.course.timeOfDay.ambientK)
+        case "temperature":
+            if let a = args.first, case let .str(id) = a { return .float(sim.temperature(of: id)) }
+            return .float(sim.temperature(of: nil))
         case "time": return .float(sim.time - startTime)
         case "mass": return .float(sim.mass)
         case "thrust_max": return .float(sim.thrustMax)
@@ -130,18 +132,29 @@ public final class ScriptGuidance: FlightGuidance, VMHost {
             guard args.count == 2, case let .str(n) = args[0] else { throw VMFault(.type, "craft.plot(name, value) expects a string and a number") }
             sim.plot(n, try num(args, 1, name)); return .none
         case "lidar":
-            if sim.partIds.contains("lidar-sensor") { return .float(-1) }
+            if sim.partIds.contains("lidar-sensor") { return .float(sim.lidar(angleDeg: try num(args, 0, name))) }
             return sensor("craft.lidar", part: "lidar-sensor", empty: .float(-1), emptyText: "-1")
         case "lidar_scan":
             if sim.partIds.contains("lidar-sensor") {
-                return .list(ListRef(stride(from: -180, to: 180, by: 10).map { .tuple([.float(Double($0)), .float(-1)]) }))
+                return .list(ListRef(sim.lidarScan().map { .tuple([.float($0.0), .float($0.1)]) }))
             }
             return sensor("craft.lidar_scan", part: "lidar-sensor", empty: .list(ListRef([])), emptyText: "an empty list")
-        case "radar", "radar_tracks":
-            if sim.partIds.contains("radar-sensor") { return .list(ListRef([])) }
-            return sensor("craft.\(name)", part: "radar-sensor", empty: .list(ListRef([])), emptyText: "an empty list")
+        case "radar":
+            if sim.partIds.contains("radar-sensor") {
+                return .list(ListRef(sim.radar().map { .tuple([.float($0.0), .float($0.1), .float($0.2), .float($0.3)]) }))
+            }
+            return sensor("craft.radar", part: "radar-sensor", empty: .list(ListRef([])), emptyText: "an empty list")
+        case "radar_tracks":
+            if sim.partIds.contains("radar-sensor") {
+                return .list(ListRef(sim.radarTracks().map {
+                    .tuple([.vec($0.0.x, $0.0.y, $0.0.z), .vec($0.1.x, $0.1.y, $0.1.z), .float($0.2)])
+                }))
+            }
+            return sensor("craft.radar_tracks", part: "radar-sensor", empty: .list(ListRef([])), emptyText: "an empty list")
         case "camera_objects":
-            if sim.partIds.contains("camera-sensor") { return .list(ListRef([])) }
+            if sim.partIds.contains("camera-sensor") {
+                return .list(ListRef(sim.cameraObjects().map { .tuple([.str($0.0), .float($0.1), .float($0.2), .float($0.3)]) }))
+            }
             return sensor("craft.camera_objects", part: "camera-sensor", empty: .list(ListRef([])), emptyText: "an empty list")
         default:
             throw VMFault(.name, "craft has no function '\(name)'")

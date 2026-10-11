@@ -187,13 +187,13 @@ import math
 #   yaw rate = KP * error + KI * integral + KD * derivative
 
 G = 9.80665
-CRUISE_SPEED = 15.0      # m/s horizontal
+CRUISE_SPEED = 12.0      # m/s horizontal
 KP = 0.0
 KI = 0.0
 KD = 0.0
 I_LIMIT = 1.0            # rad s, integral clamp
-TILT_MAX = 0.45          # rad
-K_V = 0.6                # 1/s, velocity error to acceleration
+TILT_MAX = 0.35          # rad
+K_V = 0.8                # 1/s, velocity error to acceleration
 BRAKE = 1.5              # m/s2, planned braking when nearing the target height
 VZ_MAX = 20.0            # m/s climb or sink limit
 
@@ -268,13 +268,13 @@ import math
 #   yaw rate = KP * error + KI * integral + KD * derivative
 
 G = 9.80665
-CRUISE_SPEED = 15.0      # m/s horizontal
+CRUISE_SPEED = 12.0      # m/s horizontal
 KP = 1.2
 KI = 0.05
 KD = 0.4
 I_LIMIT = 1.0            # rad s, integral clamp
-TILT_MAX = 0.45          # rad
-K_V = 0.6                # 1/s, velocity error to acceleration
+TILT_MAX = 0.35          # rad
+K_V = 0.8                # 1/s, velocity error to acceleration
 BRAKE = 1.5              # m/s2, planned braking when nearing the target height
 VZ_MAX = 20.0            # m/s climb or sink limit
 

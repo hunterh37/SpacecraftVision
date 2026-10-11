@@ -264,7 +264,7 @@ positive command), `test_zero_error_zero_command`.
 | G4 | `ring-gate` | (60, 800, 300) | 12 | y = 800 |
 | G5 | `ring-gate` | (0, 1,000, 300) | 12 | y = 1,000 |
 
-Pass: G1 to G5 in order, finish crossed, no failure. Par: fuel 330 kg, clearance 6 m (distance from
+Pass: G1 to G5 in order, finish crossed, no failure. Par: fuel 380 kg, clearance 6 m (distance from
 CoM to the gate torus at each pass, minimum).
 
 Course C3 (drift, M3) is C2 with wind from 270 deg at 8 m/s, moderate gusts, seed 3303, and gate
@@ -284,13 +284,13 @@ import math
 #   yaw rate = KP * error + KI * integral + KD * derivative
 
 G = 9.80665
-CRUISE_SPEED = 15.0      # m/s horizontal
+CRUISE_SPEED = 12.0      # m/s horizontal
 KP = 0.0
 KI = 0.0
 KD = 0.0
 I_LIMIT = 1.0            # rad s, integral clamp
-TILT_MAX = 0.45          # rad
-K_V = 0.6                # 1/s, velocity error to acceleration
+TILT_MAX = 0.35          # rad
+K_V = 0.8                # 1/s, velocity error to acceleration
 BRAKE = 1.5              # m/s2, planned braking when nearing the target height
 VZ_MAX = 20.0            # m/s climb or sink limit
 

@@ -74,6 +74,41 @@ public struct CraftDesign: Codable, Sendable, Hashable, Identifiable {
     public static func rGates() -> CraftDesign {
         var c = rHop(fuelLoad: 1.0); c.name = "R-gates"; return c
     }
+
+    /// R-gates plus a lidar on the probe core (specs/15).
+    public static func rWalls() -> CraftDesign {
+        var c = rGates(); c.name = "R-walls"
+        c.radial.append(PartInstance(partId: "lidar-sensor", parentId: c.stack[1].id))
+        return c
+    }
+
+    /// Debris climber: nose, probe (imu, battery, radar, camera), tank M, liquid engine, 4 fins, 2 solids on the tank.
+    public static func rDebris(payload: Double = 50) -> CraftDesign {
+        let nose = PartInstance(partId: "nose-cone"), probe = PartInstance(partId: "probe-core")
+        let tank = PartInstance(partId: "fuel-tank-m"), engine = PartInstance(partId: "engine-liquid-small")
+        return CraftDesign(name: "R-debris", stack: [nose, probe, tank, engine], radial: [
+            PartInstance(partId: "imu", parentId: probe.id), PartInstance(partId: "battery-pack", parentId: probe.id),
+            PartInstance(partId: "radar-sensor", parentId: probe.id), PartInstance(partId: "camera-sensor", parentId: probe.id),
+            PartInstance(partId: "fin-trapezoid", parentId: engine.id, count: 4),
+            PartInstance(partId: "engine-solid-small", parentId: tank.id, count: 2),
+        ], payloadMass: payload)
+    }
+
+    /// A-field aircraft: tractor prop, probe core, two fuselage sections (two packs, lidar on top), tail cone,
+    /// two default wings, two elevons, one vertical fin (specs/15).
+    public static func aField(payload: Double = 20) -> CraftDesign {
+        let prop = PartInstance(partId: "engine-prop"), probe = PartInstance(partId: "probe-core")
+        let f1 = PartInstance(partId: "fuselage-section"), f2 = PartInstance(partId: "fuselage-section")
+        let tail = PartInstance(partId: "nose-cone")
+        return CraftDesign(name: "A-field", stack: [prop, probe, f1, f2, tail], radial: [
+            PartInstance(partId: "imu", parentId: probe.id),
+            PartInstance(partId: "battery-pack", parentId: f1.id), PartInstance(partId: "battery-pack", parentId: f2.id),
+            PartInstance(partId: "lidar-sensor", parentId: f1.id),
+            PartInstance(partId: "wing-section", parentId: f1.id, count: 2),
+            PartInstance(partId: "elevon", parentId: f2.id, count: 2),
+            PartInstance(partId: "fin-trapezoid", parentId: f2.id),
+        ], payloadMass: payload)
+    }
 }
 
 public struct CraftStats: Sendable, Hashable {
