@@ -132,6 +132,7 @@ struct LessonDeckView: View {
                     Circle().fill(k == i ? Brand.telemetry : Lab.faint.opacity(0.4)).frame(width: 7, height: 7)
                 }
             }
+            MiniGameView(lesson: lesson.id)
         }
     }
 
