@@ -103,6 +103,13 @@ final class AppModel {
         return w
     }
 
+    /// The real rocket so far, from the live simulator, for the path graph's live marker.
+    var liveFlight: FlightLive? {
+        guard flight.phase != .idle, let s = flight.sim else { return nil }
+        _ = flight.time      // observed, so the graph redraws every frame of a launch
+        return FlightLive(samples: s.samples, running: flight.phase == .flying)
+    }
+
     /// The first thing wrong with the player's code: a compile error, or the first runtime fault from the preview.
     var codeProblem: (line: Int, text: String)? {
         if case let .error(e) = compileStatus { return (e.line, e.message) }

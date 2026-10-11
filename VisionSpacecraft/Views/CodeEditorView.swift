@@ -42,7 +42,8 @@ struct CodeEditorView: View {
     @ViewBuilder var editor: some View {
         if let lesson = model.lesson {
             CodeWorkspace(model: model.workspace(for: lesson), errorLine: model.codeProblem?.line, errorText: model.codeProblem?.text,
-                          flightDuration: model.preview?.result.duration ?? 30)
+                          flightDuration: model.preview?.result.duration ?? 30,
+                          report: model.preview.flatMap { $0.compileError == nil ? $0 : nil }, course: lesson.mission.course, live: model.liveFlight)
         }
     }
 

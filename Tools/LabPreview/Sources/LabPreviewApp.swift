@@ -19,6 +19,7 @@ struct PreviewRoot: View {
     @State private var model: CodeWorkspaceModel
     @State private var errorLine: Int?
     @State private var errorText: String?
+    @State private var report: FlightReport?
     let scene = UserDefaults.standard.string(forKey: "scene") ?? "blocks"
     let lessonIndex = UserDefaults.standard.integer(forKey: "lesson")
 
@@ -34,7 +35,7 @@ struct PreviewRoot: View {
     var body: some View {
         ZStack {
             Color(red: 0.04, green: 0.045, blue: 0.1).ignoresSafeArea()
-            CodeWorkspace(model: model, errorLine: errorLine, errorText: errorText, flightDuration: 30)
+            CodeWorkspace(model: model, errorLine: errorLine, errorText: errorText, flightDuration: report?.result.duration ?? 30, report: report, course: model.lesson.mission.course)
                 .padding(30)
         }
         .task { await setup() }
@@ -42,6 +43,7 @@ struct PreviewRoot: View {
 
     func setup() async {
         guard let p = model.program else { return }
+        defer { if errorLine == nil { let l = model.lesson; report = FlightPreview.run(source: model.source, craft: l.id == 2 ? .rGates() : .rHop(), mission: l.mission) } }
         switch scene {
         case "empty": break
         case "python": model.loadSolution(); model.tab = .python
