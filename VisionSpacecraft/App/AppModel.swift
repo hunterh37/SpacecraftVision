@@ -88,7 +88,9 @@ final class AppModel {
     }
 
     func starterCode(for m: Mission) -> String {
-        Lesson.all.first { $0.missionId == m.id }?.starterCode ?? Lesson.all[0].starterCode
+        AlgorithmChallenge.named(m.id)?.starterCode
+            ?? Lesson.all.first { $0.missionId == m.id }?.starterCode
+            ?? Lesson.all[0].starterCode
     }
 
     func workspace(for lesson: Lesson) -> CodeWorkspaceModel {

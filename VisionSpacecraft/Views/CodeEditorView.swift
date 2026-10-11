@@ -11,6 +11,9 @@ struct CodeEditorView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openImmersiveSpace) private var openSpace
     @Environment(\.dismissImmersiveSpace) private var dismissSpace
+    @State private var challengeCursor = 3.0
+
+    private var currentLesson: Lesson? { Lesson.all.first { $0.missionId == model.mission.id } }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -19,7 +22,7 @@ struct CodeEditorView: View {
                     Text("\(model.mission.id) \(model.mission.title)").font(.title3.bold())
                     Text("Python").font(.caption).padding(.horizontal, 8).padding(.vertical, 3).background(.thinMaterial, in: Capsule())
                     Spacer()
-                    Button("Reset to starter", systemImage: "arrow.counterclockwise") { if let l = model.lesson { model.workspace(for: l).resetToStarter() } else { model.resetCode() } }
+                    Button("Reset to starter", systemImage: "arrow.counterclockwise") { if let l = currentLesson { model.workspace(for: l).resetToStarter() } else { model.resetCode() } }
                     Button("Run", systemImage: "play.fill") {
                         Task {
                             await SpaceSwitcher(model: model, open: openSpace, dismiss: dismissSpace).show(.range)
@@ -40,10 +43,20 @@ struct CodeEditorView: View {
     }
 
     @ViewBuilder var editor: some View {
-        if let lesson = model.lesson {
+        if let lesson = currentLesson {
             CodeWorkspace(model: model.workspace(for: lesson), errorLine: model.codeProblem?.line, errorText: model.codeProblem?.text,
                           flightDuration: model.preview?.result.duration ?? 30,
                           report: model.preview.flatMap { $0.compileError == nil ? $0 : nil }, course: lesson.mission.course, live: model.liveFlight)
+        } else {
+            VStack(alignment: .leading, spacing: 10) {
+                if let challenge = AlgorithmChallenge.named(model.mission.id) {
+                    Text(challenge.strategy).font(.headline)
+                    Text(challenge.tuningHint).font(.callout).foregroundStyle(.secondary)
+                }
+                PythonEditor(text: Binding(get: { model.source }, set: { model.source = $0 }),
+                             errorLine: model.codeProblem?.line, errorText: model.codeProblem?.text)
+                FlightPathView(report: model.preview, course: model.mission.course, cursor: $challengeCursor, height: 120)
+            }
         }
     }
 

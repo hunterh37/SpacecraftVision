@@ -21,6 +21,8 @@ complete when its mission passes and the analysis question is answered.
 
 Missions, courses, starter code and reference solutions: `15-missions-courses.md`. Narration and
 mini game copy: `16-ui-copy.md`. M3 drift is an optional practice mission unlocked after lesson 2.
+The playable M1T and M1P Missions compare an open-loop timer with drag-aware apogee prediction on
+the hop course, then change payload and budget so players must retune their guidance and build.
 
 ## Stage detail (lesson 3 as example)
 

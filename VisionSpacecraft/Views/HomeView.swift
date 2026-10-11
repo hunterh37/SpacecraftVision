@@ -157,12 +157,19 @@ private struct ModeView: View {
     private var missions: some View {
         ForEach(Mission.all) { m in
             Row(index: m.id, title: m.title, detail: summary(m), tint: mode.tint) {
-                Button("Fly") {
-                    model.mission = m
-                    model.missionPicked = true
-                    Task { await switcher.show(.range) }
+                HStack {
+                    Button("Code") {
+                        model.mission = m
+                        model.missionPicked = true
+                        openWindow(id: WindowID.code)
+                    }
+                    Button("Fly") {
+                        model.mission = m
+                        model.missionPicked = true
+                        Task { await switcher.show(.range) }
+                    }
+                    .buttonStyle(BrandButtonStyle())
                 }
-                .buttonStyle(BrandButtonStyle())
             }
             .onTapGesture { model.mission = m; model.missionPicked = true }
             .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(model.mission.id == m.id ? mode.tint : .clear, lineWidth: 2))
@@ -186,6 +193,9 @@ private struct ModeView: View {
     }
 
     private func summary(_ m: Mission) -> String {
+        if let challenge = AlgorithmChallenge.named(m.id) {
+            return "\(challenge.strategy) · \(challenge.buildReason)"
+        }
         let goal: String
         switch m.goal {
         case let .hop(lo, hi, _): goal = "Apogee \(Int(lo))–\(Int(hi)) m, land in zone"

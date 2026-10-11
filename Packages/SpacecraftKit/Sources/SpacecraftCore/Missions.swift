@@ -138,11 +138,20 @@ public struct Mission: Codable, Sendable, Hashable, Identifiable {
                                     massCap: 450, partCap: 12, budget: 20_000, energyCap: 2_500, fixedFuelLoad: 0.10,
                                     allowedParts: m1Parts, goal: .hop(apogeeMin: 950, apogeeMax: 1200, pitchRMSDeg: 2),
                                     parFuel: 34, parClearance: nil)
+    /// Two optional coding challenges on the proven hop course: an open-loop timer and a drag-aware predictor.
+    public static let m1t = Mission(id: "M1T", title: "Clockwork hop", lesson: nil, courseId: "C1", payloadMass: 20,
+                                    massCap: 450, partCap: 12, budget: 20_000, energyCap: 2_500, fixedFuelLoad: 0.10,
+                                    allowedParts: m1Parts, goal: .hop(apogeeMin: 1050, apogeeMax: 1150, pitchRMSDeg: nil),
+                                    parFuel: 34.5, parClearance: nil)
+    public static let m1p = Mission(id: "M1P", title: "Predictive hop", lesson: nil, courseId: "C1", payloadMass: 35,
+                                    massCap: 450, partCap: 12, budget: 19_000, energyCap: 2_500, fixedFuelLoad: 0.10,
+                                    allowedParts: m1Parts, goal: .hop(apogeeMin: 1080, apogeeMax: 1120, pitchRMSDeg: nil),
+                                    parFuel: 35, parClearance: nil)
     public static let m2 = Mission(id: "M2", title: "Gates", lesson: 2, courseId: "C2", payloadMass: 20, massCap: 1_600,
                                    partCap: 16, budget: 26_000, energyCap: 2_500, fixedFuelLoad: nil,
                                    allowedParts: m1Parts + ["fuel-tank-m", "decoupler"], goal: .gates,
                                    parFuel: 260, parClearance: 6)
-    public static let all = [m1, m1w, m2]
+    public static let all = [m1, m1w, m1t, m1p, m2]
     public static func named(_ id: String) -> Mission? { all.first { $0.id == id } }
 }
 

@@ -32,6 +32,8 @@ inner radius r uses uniform scale r / 3.5; its base frame is hidden above 20 m. 
 |---|---|---|---|---|---|---|---|---|---|---|
 | `M1` | Hop | 0 | Rocket | `C1` | 20 | 450 | 12 | 20,000 | 2,500 | fixed 10% |
 | `M1W` | Hop in wind | 1 | Rocket | `C1W` | 20 | 450 | 12 | 20,000 | 2,500 | fixed 10% |
+| `M1T` | Clockwork hop | optional challenge | Rocket | `C1` | 20 | 450 | 12 | 20,000 | 2,500 | fixed 10% |
+| `M1P` | Predictive hop | optional challenge | Rocket | `C1` | 35 | 450 | 12 | 19,000 | 2,500 | fixed 10% |
 | `M2` | Gates | 2 | Rocket | `C2` | 20 | 1,600 | 16 | 26,000 | 2,500 | free |
 | `M2B` | Gates and walls | 3 | Rocket | `C2B` | 20 | 1,600 | 16 | 30,000 | 2,500 | free |
 | `M3` | Drift | practice after 2 | Rocket | `C3` | 20 | 1,600 | 16 | 26,000 | 2,500 | free |
@@ -44,12 +46,18 @@ inner radius r uses uniform scale r / 3.5; its base frame is hidden above 20 m. 
 
 | Mission | Allowed parts |
 |---|---|
-| `M1`, `M1W` | probe-core, imu, battery-pack, nose-cone, fuel-tank-s, engine-liquid-small, fin-trapezoid, parachute |
+| `M1`, `M1W`, `M1T`, `M1P` | probe-core, imu, battery-pack, nose-cone, fuel-tank-s, engine-liquid-small, fin-trapezoid, parachute |
+
 | `M2`, `M3` | M1 list plus fuel-tank-m, decoupler |
 | `M2B` | M2 list plus lidar-sensor |
 | `M4`, `M5` | probe-core, imu, battery-pack, nose-cone, fuselage-section, engine-prop, wing-section, elevon, fin-trapezoid, landing-gear, solar-panel, lidar-sensor |
 | `M6` | M2B list plus fuel-tank-l, engine-solid-small, radar-sensor, camera-sensor |
 | `M7` | M4 list plus camera-sensor, radar-sensor |
+
+`M1T` and `M1P` are playable comparison challenges implemented in `Curriculum/AlgorithmChallenges.swift`.
+`M1T` stops the engine after a timed burn and targets a 1,050–1,150 m apogee. `M1P` uses height,
+vertical speed and a tunable atmospheric correction to predict apogee for a 35 kg payload; it targets
+1,080–1,120 m. Both use the C1 landing zone and have failing starters and passing reference scripts.
 
 ## Reference crafts
 
