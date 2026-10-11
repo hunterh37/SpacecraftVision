@@ -403,13 +403,13 @@ extension WalkthroughModel {
                      await a.switcher.show(.workshop)
                      a.openWindow(id: WindowID.parts)
                  }),
-        WalkStep(id: 1, title: "ADD A PART", body: "Pinch a part in the Parts window.",
-                 more: "Engines go to the bottom, nose cones to the top, the rest above the selected part. Greyed parts would break a cap.",
+        WalkStep(id: 1, title: "BUILD", body: "Pinch Watch build, or lift a part from the rack onto the glowing ring.",
+                 more: "Parts stand life size on the rack. The ghost shows where the next one goes. Hold it near the ring and it locks. The Parts window still adds parts directly.",
                  isComplete: { $0.partsAdded > 0 },
                  demo: { a in
                      let m = a.model
-                     if let id = m.mission.allowedParts.first(where: { m.addBlock($0) == nil }) { m.addPart(id) }
-                     else { m.clearCraft(); m.loadReferenceCraft(); m.partsAdded += 1 }
+                     if !m.assembly.active { m.assembly.start(.manual, model: m) }
+                     m.assembly.showMe = true
                  }),
         WalkStep(id: 2, title: "ARRANGE", body: "Use the arrows to move a part up or down the stack.",
                  more: "Tap a stack row to select it. New parts insert above the selection. Trash removes a part and its radial parts.",

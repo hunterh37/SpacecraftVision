@@ -19,6 +19,7 @@ enum PartMeshFactory {
     static let articulatedIds: Set<String> = [
         "command-pod", "engine-solid-small", "engine-liquid-small", "engine-prop", "decoupler", "parachute",
         "fin-trapezoid", "wing-section", "elevon", "landing-gear", "solar-panel", "lidar-sensor",
+        "windsock", "gantry-crane",
     ]
 
     static func entity(_ id: String, seed: UInt64 = 1, state: String? = nil) async -> Entity {
