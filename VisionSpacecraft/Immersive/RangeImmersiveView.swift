@@ -27,19 +27,34 @@ struct RangeImmersiveView: View {
             if let hud = attachments.entity(for: "hud") {
                 scene.hud = hud
                 content.add(hud)
+                if let callout = attachments.entity(for: "callout") {
+                    // Left of the HUD, angled toward the viewer; follows the HUD in every view.
+                    callout.position = [-0.6, 0.04, 0.03]
+                    callout.orientation = simd_quatf(angle: 0.3, axis: [0, 1, 0])
+                    hud.addChild(callout)
+                    scene.callout = callout
+                }
             }
+            content.add(scene.indicators.world)
             await scene.buildStatic(course: model.mission.course)
             await scene.rebuildCraft(model.craft)
             scene.applyView(model.flightView, course: model.mission.course)
             scene.subscription = content.subscribe(to: SceneEvents.Update.self) { [model, scene] e in
                 model.flight.tick(e.deltaTime)
                 scene.updateCraft(model.flight, view: model.flightView, course: model.mission.course)
+                model.walkthrough.tick(e.deltaTime, model: model)
+                scene.updateIndicators(model, dt: Float(e.deltaTime))
             }
         } update: { _, _ in
         } attachments: {
             Attachment(id: "hud") {
                 FlightHUDView()
                     .environment(model)
+            }
+            Attachment(id: "callout") {
+                CalloutView()
+                    .environment(model)
+                    .animation(.easeOut(duration: 0.35), value: model.walkthrough.current?.id)
             }
         }
         .task(id: model.craft) { await scene.rebuildCraft(model.craft) }
@@ -49,6 +64,8 @@ struct RangeImmersiveView: View {
             scene.applyView(model.flightView, course: model.mission.course)
         }
         .onChange(of: model.flight.launchID) { scene.resetCraftPose() }
+        .onChange(of: model.walkthrough.successCount) { scene.playSuccess() }
+        .onAppear { model.walkthrough.startIfNeeded() }
     }
 
     struct RibbonKey: Hashable { var n: Int; var t: Double; var view: FlightView }
@@ -67,6 +84,10 @@ final class RangeScene {
     var mainChute: ModelEntity?
     var marker: ModelEntity?
     var hud: Entity?
+    var callout: Entity?
+    let indicators = SpatialIndicators()
+    /// Highest predicted sample, course frame, for the walkthrough's path step.
+    private(set) var ribbonApex: Vec3?
     var env: RealEnvironment?
     var subscription: EventSubscription?
     private var builtStatic = false
@@ -77,6 +98,35 @@ final class RangeScene {
         root.addChild(courseHolder)
         root.addChild(ribbonHolder)
         root.addChild(craftHolder)
+        root.addChild(indicators.course)
+    }
+
+    // MARK: Walkthrough indicators
+
+    func updateIndicators(_ model: AppModel, dt: Float) {
+        indicators.tick(dt)
+        guard let step = model.walkthrough.current, let callout else { indicators.hideAll(); return }
+        let from = callout.position(relativeTo: nil) + [0, -0.1, 0]
+        let s = root.scale.x
+        switch step.target {
+        case .pad:
+            indicators.show(beacon: true, haloAt: nil, leader: (from, root.convert(position: [0, 4, 0], to: nil)))
+        case .ribbon:
+            guard let apex = ribbonApex else { indicators.show(beacon: false, haloAt: nil, leader: nil); return }
+            let p = root.convert(position: rk(apex) + [0, 0.5, 0], to: nil)
+            indicators.show(beacon: false, haloAt: (p, 6 * s), leader: (from, p))
+        case .craft:
+            let base = root.convert(position: craftHolder.position - [0, Float(craftModel.map { -$0.position.y } ?? 2), 0] + [0, 0.1, 0],
+                                    to: nil)
+            indicators.show(beacon: true, haloAt: (base, 2.2 * s), leader: (from, base + [0, 3 * s, 0]))
+        case .hud:
+            indicators.show(beacon: false, haloAt: nil, leader: nil)
+        }
+    }
+
+    func playSuccess() {
+        guard let callout else { return }
+        indicators.playBurst(at: callout.position(relativeTo: nil))
     }
 
     func buildStatic(course: Course) async {
@@ -235,6 +285,7 @@ final class RangeScene {
     /// Predicted path as a dotted ribbon coloured by speed; red marker at the predicted failure point.
     func rebuildRibbon(_ report: FlightReport?, view: FlightView) {
         ribbonHolder.children.removeAll()
+        ribbonApex = report?.samples.max { $0.position.z < $1.position.z }?.position
         guard let report, !report.samples.isEmpty else { return }
         let r: Float = view == .tabletop ? 5 : 0.35
         let samples = report.samples

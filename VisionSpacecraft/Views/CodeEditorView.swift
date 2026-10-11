@@ -26,6 +26,7 @@ struct CodeEditorView: View {
                     }
                     .buttonStyle(.borderedProminent)
                 }
+                TipBanner(tip: .code)
                 editor
                 status
             }

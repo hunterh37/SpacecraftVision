@@ -63,6 +63,8 @@ final class FlightController {
         snapshot()
     }
 
+    func clearError() { launchError = nil }
+
     func abort() {
         guard sim != nil else { return }
         finish()

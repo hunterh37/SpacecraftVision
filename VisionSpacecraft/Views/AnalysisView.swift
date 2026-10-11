@@ -28,6 +28,7 @@ struct AnalysisView: View {
             }
             .padding(20)
         }
+        .onAppear { model.analysisOpened = true }
     }
 }
 

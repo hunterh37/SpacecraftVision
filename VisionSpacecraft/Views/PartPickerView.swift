@@ -10,20 +10,27 @@ struct PartPickerView: View {
         @Bindable var model = model
         NavigationStack {
             List {
+                Section {
+                    TipBanner(tip: .hangar)
+                    budgetMeter
+                }
                 Section("Rack: \(model.mission.id) parts") {
                     ForEach(model.mission.allowedParts, id: \.self) { id in
                         if let def = PartCatalog.part(id) {
+                            let block = model.addBlock(id)
                             Button { model.addPart(id) } label: {
                                 HStack {
                                     Image(systemName: icon(def.category)).frame(width: 28)
                                     VStack(alignment: .leading) {
                                         Text(def.displayName)
-                                        Text(detail(def)).font(.caption).foregroundStyle(.secondary)
+                                        Text(block ?? detail(def)).font(.caption)
+                                            .foregroundStyle(block == nil ? Color.secondary : Brand.ignition)
                                     }
                                     Spacer()
                                     Text("\(def.cost) cr").font(.caption.monospacedDigit())
                                 }
                             }
+                            .disabled(block != nil)
                         }
                     }
                 }
@@ -70,6 +77,23 @@ struct PartPickerView: View {
                 }
             }
             .navigationTitle("Parts")
+        }
+    }
+
+    var budgetMeter: some View {
+        let s = model.craft.stats(), m = model.mission
+        let left = m.budget - s.cost
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("BUDGET").font(Brand.label(11)).tracking(3).foregroundStyle(Brand.dim)
+                Spacer()
+                Text(left >= 0 ? "\(left) cr left" : "\(-left) cr over")
+                    .font(Brand.label(13)).foregroundStyle(left >= 0 ? Brand.telemetry : Brand.ignition)
+            }
+            ProgressView(value: min(Double(s.cost), Double(m.budget)), total: Double(m.budget))
+                .tint(left >= 0 ? Brand.telemetry : Brand.ignition)
+            Text("\(s.cost) / \(m.budget) cr · \(s.partCount) / \(m.partCap) parts · \(Int(s.wetMass)) / \(Int(m.massCap)) kg")
+                .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
         }
     }
 

@@ -40,6 +40,9 @@ final class AppModel {
 
     // Flight
     let flight = FlightController()
+    let walkthrough = WalkthroughModel()
+    /// Set when the Analysis window first appears (walkthrough step 5).
+    var analysisOpened = false
     var lastReport: FlightReport?
     var lastCommands: [CommandRecord] = []
     var reports: [FlightReport] = []
@@ -82,10 +85,24 @@ final class AppModel {
 
     var blockers: [LaunchBlocker] { mission.blockers(for: craft) }
 
+    /// Reason adding a part would break a mission cap, or nil when it fits.
+    func addBlock(_ id: String) -> String? {
+        guard let def = PartCatalog.part(id) else { return "Unknown part" }
+        let n = id == "fin-trapezoid" ? 4 : 1
+        let s = craft.stats()
+        let cost = s.cost + def.cost * n
+        if cost > mission.budget { return "+\(def.cost * n) cr. Over budget by \(cost - mission.budget) cr" }
+        if s.partCount + n > mission.partCap { return "Part cap \(mission.partCap) reached" }
+        let load = def.mount == .stack ? (mission.fixedFuelLoad ?? 1) : 1
+        let wet = s.wetMass + Double(n) * (def.dryMass + def.propellantMass * load)
+        if wet > mission.massCap { return "+\(Int(wet - s.wetMass)) kg. Over mass cap by \(Int(wet - mission.massCap)) kg" }
+        return nil
+    }
+
     // MARK: Workshop edits
 
     func addPart(_ id: String) {
-        guard let def = PartCatalog.part(id) else { return }
+        guard let def = PartCatalog.part(id), addBlock(id) == nil else { return }
         if def.mount == .stack {
             var inst = PartInstance(partId: id, fuelLoad: mission.fixedFuelLoad ?? 1.0)
             if def.propellantMass == 0 { inst.fuelLoad = 1 }
@@ -142,6 +159,7 @@ final class AppModel {
     // MARK: Preview
 
     func schedulePreview() {
+        if flight.phase == .idle { flight.clearError() }
         previewTask?.cancel()
         let src = source, craft = craft, mission = mission
         previewTask = Task {

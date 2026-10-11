@@ -39,6 +39,8 @@ struct StatBoardView: View {
                     }
                     .foregroundStyle(.red)
                 }
+                Button("Load reference craft", systemImage: "arrow.uturn.backward") { model.loadReferenceCraft() }
+                    .buttonStyle(BrandButtonStyle())
             }
         }
         .padding(24)
