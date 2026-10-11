@@ -162,7 +162,7 @@ public struct HandSteer: Sendable {
 // MARK: Lesson 5: marble on a slope (potential field)
 
 public struct Marble: Sendable {
-    public struct Hill: Sendable { public var x, y: Double }
+    public struct Hill: Sendable { public var x, y: Double; public init(x: Double, y: Double) { self.x = x; self.y = y } }
     public var hills: [Hill] = []
     public let goal = (x: 0.0, y: 8.0)
     public private(set) var x = 0.0, y = -8.0, vx = 0.0, vy = 0.0, stillTime = 0.0, time = 0.0

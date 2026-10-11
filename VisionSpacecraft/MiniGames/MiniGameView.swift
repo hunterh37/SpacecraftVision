@@ -195,7 +195,10 @@ private struct MarbleGame: View {
                     ctx.fill(dot(pt(m.x, m.y), 6), with: .color(.accentColor))
                 }
                 .contentShape(Rectangle())
-                .onTapGesture { p in m.place(.init(x: (p.x - geo.size.width / 2) / s, y: (geo.size.height / 2 - p.y) / s)) }
+                .onTapGesture { p in
+                    let x = Double((p.x - geo.size.width / 2) / s), y = Double((geo.size.height / 2 - p.y) / s)
+                    m.place(.init(x: x, y: y))
+                }
             }
             HStack {
                 Button("Roll") { m.restart(); running = true }
