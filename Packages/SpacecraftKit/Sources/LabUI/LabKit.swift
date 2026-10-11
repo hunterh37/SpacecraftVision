@@ -1,37 +1,55 @@
 import SwiftUI
 
-/// A screen title in the shared style: tracked mono caption on a short tinted rule, then the display title.
+/// A screen title in the shared style. Two flavours share one type:
+///  - `LabHeader("Title", caption: "Last flight", onBack: ...)`: tracked caption on a short tinted rule, then the display title, with an optional back button.
+///  - `LabHeader(kicker: "M1 · Python", title: "Mission")`: mono kicker over an uppercase display title.
 public struct LabHeader<Trailing: View>: View {
     public var title: String
     public var caption: String?
+    public var kicker: String?
     public var tint: Color
     public var onBack: (() -> Void)?
     @ViewBuilder public var trailing: Trailing
 
     public init(_ title: String, caption: String? = nil, tint: Color = Brand.telemetry, onBack: (() -> Void)? = nil, @ViewBuilder trailing: () -> Trailing = { EmptyView() }) {
-        self.title = title; self.caption = caption; self.tint = tint; self.onBack = onBack; self.trailing = trailing()
+        self.title = title; self.caption = caption; self.kicker = nil; self.tint = tint; self.onBack = onBack; self.trailing = trailing()
+    }
+
+    public init(kicker: String, title: String, tint: Color = Brand.ignition, @ViewBuilder trailing: () -> Trailing = { EmptyView() }) {
+        self.title = title; self.caption = nil; self.kicker = kicker; self.tint = tint; self.onBack = nil; self.trailing = trailing()
     }
 
     public var body: some View {
-        HStack(alignment: .bottom, spacing: 14) {
-            if let onBack {
-                Button(action: onBack) { Image(systemName: "chevron.left").font(.system(size: 16, weight: .bold)).foregroundStyle(Brand.ink).frame(width: 44, height: 44) }
-                    .buttonStyle(.plain)
-                    .background(Circle().fill(tint.opacity(0.16))).overlay { Circle().strokeBorder(tint.opacity(0.5), lineWidth: 1) }
-                    .lift()
-                    .accessibilityLabel("Back")
-            }
-            VStack(alignment: .leading, spacing: 6) {
-                if let caption {
-                    HStack(spacing: 8) {
-                        Rectangle().fill(tint).frame(width: 26, height: 3).clipShape(Capsule())
-                        Text(caption.uppercased()).font(Brand.label(11)).tracking(2.4).foregroundStyle(tint)
-                    }
+        if let kicker {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(kicker.uppercased()).font(Brand.label(12)).tracking(3).foregroundStyle(tint)
+                    Text(title.uppercased()).font(Lab.display(24)).foregroundStyle(Lab.ink).lineLimit(1).minimumScaleFactor(0.6)
                 }
-                Text(title).font(Lab.display(26)).foregroundStyle(Brand.ink).lineLimit(2)
+                Spacer(minLength: 8)
+                trailing
             }
-            Spacer(minLength: 12)
-            trailing
+        } else {
+            HStack(alignment: .bottom, spacing: 14) {
+                if let onBack {
+                    Button(action: onBack) { Image(systemName: "chevron.left").font(.system(size: 16, weight: .bold)).foregroundStyle(Brand.ink).frame(width: 44, height: 44) }
+                        .buttonStyle(.plain)
+                        .background(Circle().fill(tint.opacity(0.16))).overlay { Circle().strokeBorder(tint.opacity(0.5), lineWidth: 1) }
+                        .lift()
+                        .accessibilityLabel("Back")
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    if let caption {
+                        HStack(spacing: 8) {
+                            Rectangle().fill(tint).frame(width: 26, height: 3).clipShape(Capsule())
+                            Text(caption.uppercased()).font(Brand.label(11)).tracking(2.4).foregroundStyle(tint)
+                        }
+                    }
+                    Text(title).font(Lab.display(26)).foregroundStyle(Brand.ink).lineLimit(2)
+                }
+                Spacer(minLength: 12)
+                trailing
+            }
         }
     }
 }

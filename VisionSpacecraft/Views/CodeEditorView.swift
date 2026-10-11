@@ -16,29 +16,28 @@ struct CodeEditorView: View {
     private var currentLesson: Lesson? { Lesson.all.first { $0.missionId == model.mission.id } }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 18) {
+        HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 14) {
-                LabHeader("\(model.mission.id) \(model.mission.title)", caption: "Flight code · Python") {
-                    HStack(spacing: 10) {
-                        Button("Reset", systemImage: "arrow.counterclockwise") { if let l = currentLesson { model.workspace(for: l).resetToStarter() } else { model.resetCode() } }
-                            .buttonStyle(LabSecondaryButtonStyle())
-                        Button("Run", systemImage: "play.fill") {
-                            Task {
-                                await SpaceSwitcher(model: model, open: openSpace, dismiss: dismissSpace).show(.range)
-                                model.launch()
-                            }
+                LabHeader(kicker: "\(model.mission.id) · Python", title: model.mission.title) {
+                    Button("Reset", systemImage: "arrow.counterclockwise") { if let l = currentLesson { model.workspace(for: l).resetToStarter() } else { model.resetCode() } }
+                        .buttonStyle(LabGhostButton())
+                    Button {
+                        Task {
+                            await SpaceSwitcher(model: model, open: openSpace, dismiss: dismissSpace).show(.range)
+                            model.launch()
                         }
-                        .buttonStyle(BrandButtonStyle())
-                    }
+                    } label: { Label("RUN", systemImage: "play.fill") }
+                    .buttonStyle(BrandButtonStyle())
                 }
                 TipBanner(tip: .code)
                 editor
                 status
             }
+            .padding(24)
+            Rectangle().fill(Lab.edge.opacity(0.18)).frame(width: 1).padding(.vertical, 24)
             apiReference.frame(width: 300)
         }
-        .padding(24)
-        .labWindow()
+        .labWindow(tint: Brand.telemetry, variant: .dusk, aurora: 0.18)
         .onAppear { model.codeOpened = true }
     }
 
@@ -50,56 +49,66 @@ struct CodeEditorView: View {
         } else {
             VStack(alignment: .leading, spacing: 10) {
                 if let challenge = AlgorithmChallenge.named(model.mission.id) {
-                    Text(challenge.strategy).font(.headline)
-                    Text(challenge.tuningHint).font(.callout).foregroundStyle(.secondary)
+                    Text(challenge.strategy).font(Lab.soft(17)).foregroundStyle(Lab.ink)
+                    Text(challenge.tuningHint).font(Lab.soft(14)).foregroundStyle(Lab.muted)
                 }
                 PythonEditor(text: Binding(get: { model.source }, set: { model.source = $0 }),
                              errorLine: model.codeProblem?.line, errorText: model.codeProblem?.text)
                 FlightPathView(report: model.preview, course: model.mission.course, cursor: $challengeCursor, height: 120)
             }
+            .padding(18)
+            .labPanel(tint: model.codeProblem == nil ? Brand.telemetry : Lab.danger, variant: .dusk)
         }
     }
 
     @ViewBuilder var status: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             switch model.compileStatus {
-            case .idle: Text("COMPILING").foregroundStyle(Brand.dim)
-            case .ok: Label("COMPILED", systemImage: "checkmark.circle").foregroundStyle(Brand.telemetry)
-            case let .error(e): Label("LINE \(e.line), COLUMN \(e.column): \(e.message)", systemImage: "xmark.octagon").foregroundStyle(Lab.danger)
+            case .idle: LabCaption("Compiling", tint: Lab.muted)
+            case .ok: LabCaption("Compiled", tint: Brand.telemetry)
+            case let .error(e): LabCaption("1 error · line \(e.line):\(e.column)", tint: Lab.danger)
+                Text(e.message).font(Lab.mono(12)).foregroundStyle(Color(red: 1, green: 0.83, blue: 0.85))
             }
             if let p = model.preview, p.compileError == nil {
                 if let f = p.result.failure {
                     Text("Preview: \(f.title) at \(String(format: "%.1f", f.time)) s. \(f.body)").foregroundStyle(Brand.ignition)
                 } else {
-                    Text("Preview: mission passed. Apogee \(Int(p.result.apogee)) m, \(String(format: "%.0f", p.result.duration)) s flight.").foregroundStyle(Brand.telemetry)
+                    Text("Preview: mission passed. Apogee \(Int(p.result.apogee)) m, \(String(format: "%.0f", p.result.duration)) s flight.")
+                        .foregroundStyle(Brand.telemetry)
                 }
                 if let fault = p.faults.first { Text("Runtime fault: \(fault)").foregroundStyle(Lab.danger) }
             }
-            if model.previewing { ProgressView().controlSize(.small) }
+            if model.previewing { ProgressView().controlSize(.small).tint(Brand.telemetry) }
             if let err = model.flight.launchError { Text(err).foregroundStyle(Lab.danger) }
         }
-        .font(Brand.label(12))
+        .font(Lab.soft(14))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .labCard(tint: model.codeProblem == nil ? Lab.edge : Lab.danger, corner: 18, padding: 14)
     }
 
     var apiReference: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 8) {
-                    Rectangle().fill(Brand.trajectory).frame(width: 22, height: 3).clipShape(Capsule())
-                    Text("CRAFT API").font(Brand.label(11)).tracking(2.2).foregroundStyle(Brand.trajectory)
-                }
+            VStack(alignment: .leading, spacing: 12) {
+                LabCaption("Craft API", tint: Brand.trajectory)
                 ForEach(CraftAPIReference.entries, id: \.call) { e in
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(PythonSyntax.attributed(e.call, size: 13)).font(.system(size: 13, design: .monospaced))
-                        Text(e.doc).font(.system(size: 12, weight: .medium)).foregroundStyle(Brand.dim)
+                        Text(e.call).font(Lab.mono(13)).foregroundStyle(Brand.telemetry)
+                        Text(e.doc).font(Lab.soft(12)).foregroundStyle(Lab.muted)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .labCard(corner: 14, padding: 10)
                 }
-                Divider().overlay(Lab.edge.opacity(0.2))
-                Text("ENTRY POINTS").font(Brand.label(10)).tracking(2).foregroundStyle(Brand.dim)
-                Text("setup() runs once before launch.\nupdate(dt) runs 50 times a second, dt = 0.02 s.").font(.system(size: 12, weight: .medium)).foregroundStyle(Brand.dim)
+                LabCaption("Entry points", tint: Brand.ignition).padding(.top, 6)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("setup()").font(Lab.mono(13)).foregroundStyle(Brand.telemetry)
+                    Text("Runs once before launch.").font(Lab.soft(12)).foregroundStyle(Lab.muted)
+                    Text("update(dt)").font(Lab.mono(13)).foregroundStyle(Brand.telemetry).padding(.top, 4)
+                    Text("Runs 50 times a second, dt = 0.02 s.").font(Lab.soft(12)).foregroundStyle(Lab.muted)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .labCard(corner: 14, padding: 10)
             }
             .padding(20)
         }
-        .labCard(corner: 26, tint: Brand.trajectory, variant: .tide, aurora: 0.14)
     }
 }

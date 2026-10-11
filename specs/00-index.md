@@ -19,4 +19,5 @@
 | 14-parts-catalog.md | Every craft part: mass, size, cost, unlock, nodes, limits, engines, power, sensors, drag, sources |
 | 15-missions-courses.md | Missions, courses, obstacle layouts, pass criteria, starter and reference code |
 | 16-ui-copy.md | Player-facing strings: titles, narration, mini games, failures, tooltips, buttons |
+| 18-assembly.md | Assembly bay: 3D parts on racks, watch build, manual snap and lock, 3D tips |
 | briefs/ | Draft RealityHD brief JSON for new parts |

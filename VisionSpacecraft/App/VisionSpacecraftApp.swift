@@ -11,6 +11,7 @@ struct VisionSpacecraftApp: App {
     @State private var spaceStyle: ImmersionStyle = .full
 
     init() {
+        LoosePartComponent.registerComponent()
         RealityHD.setup(.balanced)
     }
 

@@ -15,8 +15,19 @@ enum PartMeshFactory {
 
     enum Finish: String { case brushedSteel = "BrushedSteel", paintedMetal = "PaintedMetal", moldedPlastic = "MoldedPlastic" }
 
-    static func entity(_ id: String, seed: UInt64 = 1) async -> Entity {
+    /// Aerospace ids with a rig in RealityHD (docs/guides/articulation.md). Loaded live so flight can pose them.
+    static let articulatedIds: Set<String> = [
+        "command-pod", "engine-solid-small", "engine-liquid-small", "engine-prop", "decoupler", "parachute",
+        "fin-trapezoid", "wing-section", "elevon", "landing-gear", "solar-panel", "lidar-sensor",
+    ]
+
+    static func entity(_ id: String, seed: UInt64 = 1, state: String? = nil) async -> Entity {
         if !missing.contains(id) {
+            if articulatedIds.contains(id),
+               let e = try? await RealityHD.articulated(id, seed: seed, state: state, interactive: false, grabbable: false) {
+                e.name = id
+                return e
+            }
             do {
                 let e = try await RealityHD.entity(id, seed: seed)
                 e.name = id
@@ -27,6 +38,9 @@ enum PartMeshFactory {
         }
         return placeholder(id)
     }
+
+    /// True when the entity came from RealityHD (placeholders carry no RealityHD components).
+    static func isPlaceholder(_ e: Entity) -> Bool { missing.contains(e.name) }
 
     // MARK: Materials
 

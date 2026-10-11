@@ -45,6 +45,21 @@ Each craft part is an articulated asset when it has states (`docs/guides/articul
 | `imu` | prop | none | 0.1 cube |
 | `fuselage-section` | prop | none | 1.25 dia x 2.0, composite skin, access hatch |
 
+## Saturn V stack (built, `Props/Aerospace`, gate signed off)
+
+Real AS-506 dimensions, stage bottom at y = 0. `CraftDesign.saturnV()` stacks them top to bottom; workshop
+Parts window "Load Saturn V". Shared geometry in `RealityHD/Sources/RealLibrary/Props/Aerospace/SaturnKit.swift`.
+
+| Id | Size (m) | Contents | Gate |
+|---|---|---|---|
+| `saturn-s1c` | 10.06 dia x 42.1 | roll pattern, corrugated intertank, flag, UNITED STATES / USA, 2 cable tunnels, 4 finned fairings, 5 F-1 | 0.859 |
+| `saturn-s2` | 10.06 x 24.9 | S-IC/S-II interstage, 8 ullage fairings, systems tunnel, 5 J-2 | 0.852 |
+| `saturn-s4b` | 10.06 to 6.6 x 17.8 | conical interstage, aft skirt roll pattern, 2 APS modules, J-2 | 0.859 |
+| `saturn-iu` | 6.6 x 0.91 | ring, inner wall, avionics boxes, umbilical doors | 0.854 |
+| `apollo-sla` | 6.6 to 3.9 x 8.5 | cone, panel seams, SPS bell inside | 0.854 |
+| `apollo-csm` | 3.9 x 7.2 | SM with RCS quads, radiators, umbilical fairing; CM under boost protective cover | 0.856 |
+| `apollo-les` | 1.26 x 9.2 | truss tower, escape motor and nozzles, canards, Q-ball nose | 0.855 |
+
 ## New props (environment)
 
 `hangar` (structure), `launch-pad`, `launch-tower`, `blockhouse`, `runway-segment`, `gantry-crane`

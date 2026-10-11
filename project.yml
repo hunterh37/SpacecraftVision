@@ -6,7 +6,8 @@ options:
   xcodeVersion: "26.0"
 packages:
   RealityHD:
-    path: ../RealityHD
+    url: https://github.com/hunterh37/RealityHD.git
+    branch: main
   SpacecraftKit:
     path: Packages/SpacecraftKit
 targets:
