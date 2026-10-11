@@ -26,6 +26,22 @@ enum GameMode: String, CaseIterable, Identifiable, Hashable {
 
 struct HomeView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openImmersiveSpace) private var openSpace
+    @Environment(\.dismissImmersiveSpace) private var dismissSpace
+    @Environment(\.dismissWindow) private var dismissWindow
+
+    /// Learn skips the lesson list: pick the next lesson, open the range, hide this window.
+    func enterLearn() {
+        Task {
+            let l = model.nextLesson
+            model.select(lesson: l)
+            model.openLesson = l
+            model.learnActive = true
+            model.flightView = .ground
+            await SpaceSwitcher(model: model, open: openSpace, dismiss: dismissSpace).show(.range)
+            if model.openSpace == .range { dismissWindow(id: WindowID.main) } else { model.learnActive = false }
+        }
+    }
 
     var body: some View {
         @Bindable var model = model
@@ -37,7 +53,7 @@ struct HomeView: View {
                 }
                 HStack(spacing: 24) {
                     ForEach(GameMode.allCases) { mode in
-                        Button { model.homePath.append(mode) } label: { ModeCard(mode: mode, progress: progress(mode)) }
+                        Button { if mode == .learn { enterLearn() } else { model.homePath.append(mode) } } label: { ModeCard(mode: mode, progress: progress(mode)) }
                             .buttonStyle(.plain)
                             .buttonBorderShape(.roundedRectangle(radius: 32))
                             .hoverEffect(.lift)
@@ -57,7 +73,7 @@ struct HomeView: View {
             .navigationDestination(for: SettingsRoute.self) { _ in SettingsView() }
         }
         .ornament(attachmentAnchor: .scene(.trailing), contentAlignment: .leading) {
-            TourCard(tours: [.learn, .missions, .workshop]).padding(.leading, 24)
+            TourCard(tours: [.missions, .workshop]).padding(.leading, 24)
         }
         .task {
             // Evaluates tour predicates while the range is closed.
