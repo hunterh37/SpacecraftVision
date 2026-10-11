@@ -34,6 +34,7 @@ struct CodeEditorView: View {
             Divider()
             apiReference.frame(width: 300)
         }
+        .onAppear { model.codeOpened = true }
     }
 
     var editor: some View {

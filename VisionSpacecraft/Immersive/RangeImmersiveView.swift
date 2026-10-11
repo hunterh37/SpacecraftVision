@@ -119,7 +119,7 @@ final class RangeScene {
             let base = root.convert(position: craftHolder.position - [0, Float(craftModel.map { -$0.position.y } ?? 2), 0] + [0, 0.1, 0],
                                     to: nil)
             indicators.show(beacon: true, haloAt: (base, 2.2 * s), leader: (from, base + [0, 3 * s, 0]))
-        case .hud:
+        case .hud, nil:
             indicators.show(beacon: false, haloAt: nil, leader: nil)
         }
     }

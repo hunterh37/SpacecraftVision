@@ -43,6 +43,23 @@ final class AppModel {
     let walkthrough = WalkthroughModel()
     /// Set when the Analysis window first appears (walkthrough step 5).
     var analysisOpened = false
+
+    // Walkthrough signals (Walkthrough/WalkthroughModel.swift predicates and demos)
+    var homePath = NavigationPath()
+    var openLesson: Lesson?
+    var pseudocodeDemo = 0
+    var codeOpened = false
+    var missionPicked = false
+    var partsAdded = 0
+    var referenceLoads = 0
+
+    /// Pops the main window to Home and pushes a mode screen.
+    func showMode(_ m: GameMode) {
+        homePath = NavigationPath()
+        homePath.append(m)
+    }
+
+    func lessonReference(for m: Mission) -> String? { Lesson.all.first { $0.missionId == m.id }?.referenceCode }
     var lastReport: FlightReport?
     var lastCommands: [CommandRecord] = []
     var reports: [FlightReport] = []
@@ -103,6 +120,7 @@ final class AppModel {
 
     func addPart(_ id: String) {
         guard let def = PartCatalog.part(id), addBlock(id) == nil else { return }
+        partsAdded += 1
         if def.mount == .stack {
             var inst = PartInstance(partId: id, fuelLoad: mission.fixedFuelLoad ?? 1.0)
             if def.propellantMass == 0 { inst.fuelLoad = 1 }
@@ -149,6 +167,7 @@ final class AppModel {
     }
 
     func loadReferenceCraft() {
+        referenceLoads += 1
         craft = mission.id == "M2" ? .rGates() : .rHop(fuelLoad: mission.fixedFuelLoad ?? 0.1)
         craft.payloadMass = mission.payloadMass
         schedulePreview()

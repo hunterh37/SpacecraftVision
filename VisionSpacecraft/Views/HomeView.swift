@@ -25,10 +25,10 @@ enum GameMode: String, CaseIterable, Identifiable, Hashable {
 
 struct HomeView: View {
     @Environment(AppModel.self) private var model
-    @State private var path = NavigationPath()
 
     var body: some View {
-        NavigationStack(path: $path) {
+        @Bindable var model = model
+        NavigationStack(path: $model.homePath) {
             VStack(spacing: 40) {
                 VStack(spacing: 8) {
                     Text("VISION SPACECRAFT").font(Brand.display(46)).foregroundStyle(Brand.ink).tracking(4)
@@ -36,7 +36,7 @@ struct HomeView: View {
                 }
                 HStack(spacing: 24) {
                     ForEach(GameMode.allCases) { mode in
-                        Button { path.append(mode) } label: { ModeCard(mode: mode, progress: progress(mode)) }
+                        Button { model.homePath.append(mode) } label: { ModeCard(mode: mode, progress: progress(mode)) }
                             .buttonStyle(.plain)
                             .buttonBorderShape(.roundedRectangle(radius: 32))
                             .hoverEffect(.lift)
@@ -47,12 +47,23 @@ struct HomeView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(BrandBackground())
             .toolbar {
-                ToolbarItem(placement: .bottomOrnament) {
-                    Button("Replay tips", systemImage: "sparkles") { model.walkthrough.replay() }
+                ToolbarItemGroup(placement: .bottomOrnament) {
+                    Button("Settings", systemImage: "gearshape") { model.homePath.append(SettingsRoute.main) }
                 }
             }
             .navigationDestination(for: GameMode.self) { ModeView(mode: $0) }
             .navigationDestination(for: Lesson.self) { LessonView(lesson: $0) }
+            .navigationDestination(for: SettingsRoute.self) { _ in SettingsView() }
+        }
+        .ornament(attachmentAnchor: .scene(.trailing), contentAlignment: .leading) {
+            TourCard(tours: [.learn, .missions, .workshop]).padding(.leading, 24)
+        }
+        .task {
+            // Evaluates tour predicates while the range is closed.
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(150))
+                if model.openSpace != .range { model.walkthrough.tick(model: model) }
+            }
         }
         .tint(Brand.ignition)
         .preferredColorScheme(.dark)
@@ -115,10 +126,12 @@ private struct ModeView: View {
         }
         .background(BrandBackground())
         .navigationTitle(mode.title)
+        .onAppear { model.walkthrough.startIfNeeded(TourID(rawValue: mode.rawValue)!) }
         .toolbar {
             ToolbarItemGroup(placement: .bottomOrnament) {
                 Button("Code", systemImage: "chevron.left.forwardslash.chevron.right") { openWindow(id: WindowID.code) }
                 Button("Analysis", systemImage: "chart.xyaxis.line") { openWindow(id: WindowID.analysis) }
+                Button("Tour", systemImage: "sparkles") { model.walkthrough.replay(TourID(rawValue: mode.rawValue)!) }
                 if model.openSpace != nil {
                     Button("Exit space", systemImage: "xmark") { Task { await switcher.close() } }
                 }
@@ -146,11 +159,12 @@ private struct ModeView: View {
             Row(index: m.id, title: m.title, detail: summary(m), tint: mode.tint) {
                 Button("Fly") {
                     model.mission = m
+                    model.missionPicked = true
                     Task { await switcher.show(.range) }
                 }
                 .buttonStyle(BrandButtonStyle())
             }
-            .onTapGesture { model.mission = m }
+            .onTapGesture { model.mission = m; model.missionPicked = true }
             .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(model.mission.id == m.id ? mode.tint : .clear, lineWidth: 2))
         }
     }

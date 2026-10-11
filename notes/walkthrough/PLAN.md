@@ -23,6 +23,25 @@ Home (Learn / Missions / Workshop) -> mission brief -> hangar build (Parts windo
 0.25x to 4x) -> result card -> Analysis plots -> change code or craft -> relaunch. Lessons wrap the
 same loop with concept, pseudocode and graded analysis stages.
 
+## Mode tours (v2)
+
+One tour per mode, started the first time each mode screen opens; the range tour starts the first
+time the range opens. Tours queue when another is active. Done set: `walkthrough.v2.done`.
+Settings toggle `walkthrough.enabled` (default on) disables auto-start and window tips.
+Card (main window trailing ornament; range callout): Next (manual steps), Show me (performs the real
+action via the step's `demo`, then advances), Play rest (autoplays remaining steps and queued tours),
+Take over (stops autoplay), Skip tour.
+
+| Tour | Steps |
+|---|---|
+| Learn | pick lesson 00, concept, pseudocode (demo fills correct order), implement (opens editor, loads reference code), run (range, 4x), analyze (answers correctly) |
+| Missions | mission list, select, code first, fly (hands off to range tour) |
+| Workshop | enter hangar, add a part, arrange, tabletop, reference craft, to the range |
+| Range | pad, predicted path, preflight, launch, views, debrief |
+
+Settings (Home bottom ornament): guided walkthroughs toggle, replay per tour, reset all, Watch full demo
+(Learn -> Missions -> Range -> Workshop, autoplayed). Mode screens have a Tour button.
+
 ## First-run steps (range)
 
 Starts the first time the range opens. Persisted in `walkthrough.v1.done`.
@@ -51,13 +70,14 @@ Each callout: small-caps title, one line, Learn more (one detail paragraph), ste
 ## Entry points
 
 - Auto on first range open.
-- Home bottom ornament: Replay tips (resets steps and tips).
+- Home bottom ornament: Settings. Mode screen bottom ornament: Tour.
 - Launch args: `-walkthroughReset`, `-walkthroughStep N`.
 
 ## Files
 
 - `VisionSpacecraft/Walkthrough/WalkthroughModel.swift`: steps, predicates, tips, persistence.
-- `VisionSpacecraft/Walkthrough/CalloutView.swift`: range callout and window `TipBanner`.
+- `VisionSpacecraft/Walkthrough/CalloutView.swift`: `TourCard`, range callout, window `TipBanner`.
+- `VisionSpacecraft/Views/SettingsView.swift`: toggle, replay, full demo.
 - `VisionSpacecraft/Walkthrough/Indicators/SpatialIndicators.swift`: ground ring, light column, halo, leader dots, burst.
 
 ## Open items

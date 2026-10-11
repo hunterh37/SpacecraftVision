@@ -43,7 +43,15 @@ struct LessonView: View {
         }
         .padding(24)
         .navigationTitle("\(lesson.id). \(lesson.title)")
+        .onDisappear { if model.openLesson?.id == lesson.id { model.openLesson = nil } }
+        .onChange(of: model.pseudocodeDemo) {
+            placed = lesson.blocks
+            pool = lesson.distractors
+            checkResult = true
+            model.pseudocodePassed.insert(lesson.id)
+        }
         .onAppear {
+            model.openLesson = lesson
             if model.lesson?.id != lesson.id || model.mission.id != lesson.missionId { model.select(lesson: lesson) }
             resetBlocks()
         }
