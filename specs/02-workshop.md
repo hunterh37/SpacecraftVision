@@ -39,8 +39,12 @@ CoM, CoT and CoL appear as colored spheres inside the craft.
 
 ## Customize
 
-Per part: paint color from a fixed palette, decal, fuel load percent, engine gimbal range, wing
-span, sweep and taper within limits (OpenVSP parameter names), fin cant.
+Per part: paint color from a fixed palette of 12 (white F2F2F0, black 1A1A1A, orange E8622C, red
+C8302C, yellow F2C230, blue 2C5FC8, navy 1F2A44, green 3A8A4A, grey 8A8F96, silver C0C4C8, gold
+C9A23A, purple 6A4A9A), decal from 8 (flag, stripe, number 1 to 3, checker, arrow, logo, none), fuel
+load 0 to 100% in 5% steps, engine gimbal range 0 to 6 deg, wing span, root and tip chord, sweep and
+dihedral within the ranges in `14-parts-catalog.md` (OpenVSP parameter names), fin cant -5 to +5
+deg. Missions with a fixed fuel load lock the slider.
 
 ## Mission goals
 
@@ -48,13 +52,16 @@ Each mission sets: target (altitude, range, or course finish), payload mass, par
 part count cap, budget, energy cap, course id. The workshop rejects launch while a hard constraint
 fails and names the failing constraint on the stat board.
 
-Starter missions:
+Missions (full data in `15-missions-courses.md`):
 
 | Id | Craft | Goal |
 |---|---|---|
-| M1 hop | Sounding rocket | Reach 1 km, land in zone |
+| M1 hop | Sounding rocket | Apogee 1,000 to 1,200 m, land in a 100 m zone |
+| M1W hop in wind | Sounding rocket | M1 with 5 m/s wind and a pitch program |
 | M2 gates | Rocket | Pass 5 static ring gates |
-| M3 drift | Rocket | Pass gates under crosswind |
-| M4 field | Aircraft | Fly through a pylon field |
-| M5 canyon | Aircraft | Canyon run with moving obstacles |
+| M2B gates and walls | Rocket | Pass 2 gates and 3 slotted walls |
+| M3 drift | Rocket | Pass gates under 8 m/s crosswind |
+| M4 field | Aircraft | Fly through a wall and pylon field |
+| M5 canyon | Aircraft | Canyon run with moving balloons |
 | M6 debris | Rocket | Ascend through a debris field to 10 km |
+| M7 capstone | Aircraft | Generated field or canyon course |

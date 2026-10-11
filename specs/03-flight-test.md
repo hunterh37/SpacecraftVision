@@ -10,19 +10,22 @@ platform 60 m from the pad at true scale.
 
 A course is data (`11-data-model.md`): obstacles with shape, pose, motion path and a corridor
 volume. Obstacle types: ring gate, pylon, balloon, wall with gap, canyon walls, debris rock with
-spin and drift, no-fly cylinder. Courses scale from 200 m to 12 km.
+spin and drift, no-fly cylinder (a red translucent volume, corridor-type rule, no collision mesh;
+unused by v1 courses, available to custom courses). Courses scale from 200 m to 12 km. Every v1
+course (C1 to C7) is defined in `15-missions-courses.md`. Rockets start on the pad; aircraft start
+in the air at 35 m/s (catapult convention).
 
 ## Views
 
 | View | Description |
 |---|---|
 | Ground | True scale from the platform |
-| Chase | Player rides 15 m behind the craft; comfort vignette at high angular rates |
+| Chase | Player rides 15 m behind the craft; comfort vignette fades in above 30 deg/s camera yaw or pitch rate, full at 90 deg/s |
 | Tabletop | Whole course shrunk to a 2 m diorama in front of the player, craft as a marker |
 | Sensor | Craft sensor rays and detected obstacles drawn as lines and boxes |
 
-Chase view is opt-in and limited by the comfort settings. Default flight view is ground for short
-courses and tabletop for long ones.
+Chase view is opt-in and limited by the comfort settings. Default flight view is ground for courses
+under 1,500 m extent (C1, C2, C2B, C3) and tabletop for the rest.
 
 ## Preview path
 
