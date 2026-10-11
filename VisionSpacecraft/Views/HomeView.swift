@@ -57,7 +57,9 @@ struct HomeView: View {
             .navigationDestination(for: SettingsRoute.self) { _ in SettingsView() }
         }
         .ornament(attachmentAnchor: .scene(.trailing), contentAlignment: .leading) {
-            TourCard(tours: [.learn, .missions, .workshop]).padding(.leading, 24)
+            if !model.isGuidedWorkshopActive {
+                TourCard(tours: [.learn, .missions, .workshop]).padding(.leading, 24)
+            }
         }
         .task {
             // Evaluates tour predicates while the range is closed.
@@ -184,6 +186,20 @@ private struct ModeView: View {
                     openWindow(id: WindowID.parts)
                 }
                 .buttonStyle(BrandButtonStyle(tint: mode.tint))
+            }
+            Row(
+                index: "W01–4",
+                title: "Guided Workshop",
+                detail: "Optional: mission, components, scale, and design checks. Free-build remains available.",
+                tint: mode.tint
+            ) {
+                Button("Start Guided Workshop") {
+                    model.beginGuidedWorkshop()
+                    Task { await switcher.show(.workshop) }
+                    openWindow(id: WindowID.parts)
+                }
+                .buttonStyle(BrandButtonStyle(tint: mode.tint))
+                .accessibilityLabel("Start Guided Workshop")
             }
             Row(index: "▶", title: "Range", detail: "Fly the current craft on the launch range.", tint: mode.tint) {
                 Button("Launch") { Task { await switcher.show(.range) } }
