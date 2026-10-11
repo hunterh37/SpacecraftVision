@@ -19,6 +19,7 @@ struct VisionSpacecraftApp: App {
         WindowGroup(id: WindowID.main) {
             HomeView()
                 .environment(model)
+                .overlay { SceneLoadingOverlay(space: model.loadingSpace) }
                 .modifier(DebugLaunch(model: model))
         }
         .windowStyle(.plain)
@@ -79,10 +80,11 @@ struct SpaceSwitcher {
         if previous == .workshop, space != .workshop {
             model.leaveWorkshopImmersive(for: space)
         }
+        model.loadingSpace = space
         if model.openSpace != nil { await dismiss(); model.openSpace = nil }
         switch await open(id: space.rawValue) {
         case .opened: model.openSpace = space
-        default: break
+        default: model.loadingSpace = nil
         }
     }
 
@@ -148,6 +150,22 @@ private struct DebugLaunch: ViewModifier {
             model.select(lesson: Lesson.all[n])
             openWindow(id: WindowID.code)
             #endif
+        }
+    }
+}
+
+/// Progress indicator shown while an immersive space generates its assets.
+struct SceneLoadingOverlay: View {
+    let space: SpaceID?
+    var body: some View {
+        if space != nil {
+            VStack(spacing: 12) {
+                ProgressView().controlSize(.large)
+                Text("Loading scene").font(.headline)
+            }
+            .padding(32)
+            .glassBackgroundEffect()
+            .transition(.opacity)
         }
     }
 }

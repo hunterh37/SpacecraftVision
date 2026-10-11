@@ -18,6 +18,9 @@ struct Scratch {
             print(String(format: "T %.0f pos %.0f %.0f %.0f v %.1f %.1f %.1f pitch %.1f yaw %.1f roll %.1f thr %.2f clr %.1f", s.t, s.position.x, s.position.y, s.position.z, s.velocity.x, s.velocity.y, s.velocity.z, s.pitch * 57.3, s.yaw * 57.3, s.roll * 57.3, s.throttle, s.clearance ?? -1))
         }
         for e in sim.events.prefix(30) { print("EV", String(format: "%.1f", e.t), e.text) }
+        for (k, vs) in sim.userSeries.sorted(by: { $0.key < $1.key }) {
+            for (i, x) in vs.enumerated() where i % every == 0 { print("SER", k, String(format: "%.1f %.2f", x.t, x.v)) }
+        }
     }
     @Test func scratchCourses() {
         print("COURSES", Course.all.map(\.id))

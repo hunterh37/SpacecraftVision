@@ -64,6 +64,7 @@ struct RangeImmersiveView: View {
                 model.walkthrough.tick(e.deltaTime, model: model)
                 scene.updateIndicators(model, dt: Float(e.deltaTime))
             }
+            model.loadingSpace = nil
         } update: { _, _ in
         } attachments: {
             Attachment(id: "hud") {

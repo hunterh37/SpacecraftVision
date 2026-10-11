@@ -54,7 +54,7 @@ struct WorkshopImmersiveView: View {
             craftHolder.addChild(stage.ghost)
             root.addChild(stage.rack)
             if let card = attachments.entity(for: "assembly") {
-                card.position = [-1.3, 1.55, -2.0]
+                card.position = [-1.3, 1.25, -1.6]
                 card.orientation = simd_quatf(angle: 0.45, axis: [0, 1, 0])
                 root.addChild(card)
             }
@@ -64,8 +64,9 @@ struct WorkshopImmersiveView: View {
                 root.addChild(board)
             }
             if let panel = attachments.entity(for: "taskGuide") {
-                panel.position = [-1.85, 1.35, -2.4]
-                panel.orientation = simd_quatf(angle: 0.35, axis: [0, 1, 0])
+                // Right of the pad, clear of the assembly card and rack on the left.
+                panel.position = [2.3, 1.3, -1.3]
+                panel.orientation = simd_quatf(angle: -0.9, axis: [0, 1, 0])
                 root.addChild(panel)
             }
             // RealityHD clutter (existing catalog assets).
@@ -89,6 +90,7 @@ struct WorkshopImmersiveView: View {
                 }
             }
             env?.illuminate(root)
+            model.loadingSpace = nil
         } update: { _, attachments in
             if let panel = attachments.entity(for: "taskGuide") {
                 panel.isEnabled = model.taskGuideVisible && model.taskGuide.state.sessionPhase != .exited
@@ -111,7 +113,9 @@ struct WorkshopImmersiveView: View {
         .gesture(DragGesture(minimumDistance: 0.01, coordinateSpace: .local).targetedToAnyEntity()
             .onChanged { v in
                 let a = model.assembly
-                guard a.mode == .manual, !a.showMe, let plan = a.plan, let i = AssemblyStage.rackIndex(of: v.entity) else { return }
+                guard a.active, let plan = a.plan, let i = AssemblyStage.rackIndex(of: v.entity) else { return }
+                // Grabbing a rack part during Watch build or Show me hands control to the player.
+                if a.mode == .watch || a.showMe { a.takeOver() }
                 held = i
                 let hand = v.convert(v.location3D, from: .local, to: .scene)
                 let heavy = plan.steps[i].instance.definition.length > 2
