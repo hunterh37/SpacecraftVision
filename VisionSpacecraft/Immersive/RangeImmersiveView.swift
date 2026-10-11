@@ -16,6 +16,8 @@ import Curriculum
 struct RangeImmersiveView: View {
     @Environment(AppModel.self) private var model
     @State private var scene = RangeScene()
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
 
     var body: some View {
         RealityView { content, attachments in
@@ -46,14 +48,6 @@ struct RangeImmersiveView: View {
                     hud.addChild(btn)
                 }
             }
-            if let deck = attachments.entity(for: "lesson") {
-                // Left of the viewer, angled in, beside the pad sightline.
-                deck.position = [-0.95, 1.2, -1.05]
-                deck.orientation = simd_quatf(angle: 0.55, axis: [0, 1, 0])
-                deck.isEnabled = model.learnActive
-                content.add(deck)
-                scene.deck = deck
-            }
             content.add(scene.indicators.world)
             content.add(scene.vignette.root)
             scene.audio.attach(craft: scene.craftHolder, listener: scene.skyHolder)
@@ -75,10 +69,6 @@ struct RangeImmersiveView: View {
             }
             Attachment(id: "spaceBtn") {
                 SpaceViewButton()
-                    .environment(model)
-            }
-            Attachment(id: "lesson") {
-                LessonDeckView()
                     .environment(model)
             }
             Attachment(id: "callout") {
@@ -103,8 +93,13 @@ struct RangeImmersiveView: View {
         }
         .onChange(of: model.flight.gates) { _, n in scene.markGatePassed(n) }
         .onChange(of: model.walkthrough.successCount) { scene.playSuccess() }
-        .onAppear { if !model.learnActive { model.walkthrough.startIfNeeded() } }
-        .onChange(of: model.learnActive) { _, on in scene.deck?.isEnabled = on }
+        .onAppear {
+            if model.learnActive { openWindow(id: WindowID.lesson) } else { model.walkthrough.startIfNeeded() }
+        }
+        .onChange(of: model.learnActive) { _, on in
+            if on { openWindow(id: WindowID.lesson) } else { dismissWindow(id: WindowID.lesson) }
+        }
+        .onDisappear { dismissWindow(id: WindowID.lesson) }
         .modifier(FollowToSpace())
     }
 
@@ -194,7 +189,7 @@ final class RangeScene {
         let target: WalkTarget?
         let anchor: Entity?
         if let step = model.walkthrough.current { target = step.target; anchor = callout }
-        else if model.learnActive, model.flight.phase != .flying { target = Self.lessonTarget(model.lessonStage); anchor = deck }
+        else if model.learnActive, model.flight.phase != .flying { target = Self.lessonTarget(model.lessonStage); anchor = deck ?? hud }
         else { indicators.hideAll(); return }
         guard let anchor else { indicators.hideAll(); return }
         let from = anchor.position(relativeTo: nil) + [0, -0.1, 0]

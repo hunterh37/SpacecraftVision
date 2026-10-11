@@ -52,6 +52,14 @@ struct VisionSpacecraftApp: App {
         .windowStyle(.plain)
         .defaultSize(width: 900, height: 640)
 
+        WindowGroup(id: WindowID.lesson) {
+            LessonDeckView()
+                .environment(model)
+        }
+        .windowStyle(.plain)
+        .windowResizability(.contentMinSize)
+        .defaultSize(width: 620, height: 820)
+
         ImmersiveSpace(id: SpaceID.workshop.rawValue) {
             WorkshopImmersiveView()
                 .environment(model)

@@ -9,7 +9,7 @@ import TaskGuideCore
 import TaskGuideUI
 
 enum SpaceID: String { case workshop, range, space }
-enum WindowID { static let main = "main", parts = "parts", code = "code", analysis = "analysis" }
+enum WindowID { static let main = "main", parts = "parts", code = "code", analysis = "analysis", lesson = "lesson" }
 
 enum FlightView: String, CaseIterable, Identifiable {
     case ground, chase, tabletop

@@ -4,11 +4,12 @@ import Curriculum
 import SpacecraftCore
 import FlightRunner
 
-/// Learn mode deck, a range attachment beside the pad. One stage on screen, one primary button,
+/// Learn mode deck, a resizable window shown while the range is open. One stage on screen, one primary button,
 /// and the scene indicators point at the part of the rocket the stage is about.
 struct LessonDeckView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
     @Environment(\.openImmersiveSpace) private var openSpace
     @Environment(\.dismissImmersiveSpace) private var dismissSpace
     @State private var line = 0
@@ -32,7 +33,7 @@ struct LessonDeckView: View {
             }
         }
         .padding(24)
-        .frame(width: 560)
+        .frame(minWidth: 480, maxWidth: .infinity, minHeight: 520, maxHeight: .infinity, alignment: .topLeading)
         .labPanel(corner: 32, tint: Brand.telemetry, variant: .tide, aurora: 0.25)
         .tint(Brand.telemetry)
         .animation(.spring(duration: 0.3), value: stage)
@@ -170,7 +171,7 @@ struct LessonDeckView: View {
                 if pool.count <= lesson.distractors.count { check() }
             }
             if checkResult == false {
-                Text("Order is off. Tap a placed block to send it back.").font(Lab.soft(14)).foregroundStyle(Brand.ignition)
+                Text("Order is off. Tap a placed block to send it back.").font(Lab.soft(20)).foregroundStyle(Brand.ignition)
             }
         }
     }
@@ -203,7 +204,7 @@ struct LessonDeckView: View {
                     .frame(height: 340)
                 prediction
                 if wrongTail(ws.order, p) {
-                    Text("That block runs later or does not belong. Tap × to remove it.").font(Lab.soft(13)).foregroundStyle(Brand.ignition)
+                    Text("That block runs later or does not belong. Tap × to remove it.").font(Lab.soft(20)).foregroundStyle(Brand.ignition)
                 }
                 if let n = next {
                     Button("Show me", systemImage: "lightbulb") { hint(n, ws, p) }.buttonStyle(LabGhostButton())
@@ -240,7 +241,7 @@ struct LessonDeckView: View {
             }
             prediction
             if !model.blockers.isEmpty {
-                Text("Blocked: \(model.blockers.map(\.title).joined(separator: ", "))").font(Lab.soft(14)).foregroundStyle(Brand.ignition)
+                Text("Blocked: \(model.blockers.map(\.title).joined(separator: ", "))").font(Lab.soft(20)).foregroundStyle(Brand.ignition)
             }
         }
     }
@@ -267,19 +268,19 @@ struct LessonDeckView: View {
                 Text("SCORE \(g.score) · " + String(repeating: "★", count: g.stars) + String(repeating: "☆", count: 3 - g.stars))
                     .font(Lab.display(18)).foregroundStyle(Brand.ignition)
             } else if model.lastReport != nil {
-                Text("Mission not passed. Fix the code and fly again.").font(Lab.soft(14)).foregroundStyle(Brand.ignition)
+                Text("Mission not passed. Fix the code and fly again.").font(Lab.soft(20)).foregroundStyle(Brand.ignition)
             }
         }
     }
 
     @ViewBuilder private var prediction: some View {
         if case let .error(e) = model.compileStatus {
-            Text("Line \(e.line): \(e.message)").font(Lab.mono(13)).foregroundStyle(Lab.danger)
+            Text("Line \(e.line): \(e.message)").font(Lab.mono(20)).foregroundStyle(Lab.danger)
         } else if let p = model.preview {
             if let f = p.result.failure {
-                Text("Predicted: \(f.title)").foregroundStyle(Brand.ignition)
+                Text("Predicted: \(f.title)").font(Lab.display(22)).foregroundStyle(Brand.ignition)
             } else {
-                Text("Predicted: pass, apogee \(Int(p.result.apogee)) m").foregroundStyle(Brand.telemetry)
+                Text("Predicted: pass, apogee \(Int(p.result.apogee)) m").font(Lab.display(22)).foregroundStyle(Brand.telemetry)
             }
         }
     }
@@ -381,6 +382,7 @@ struct LessonDeckView: View {
         model.learnActive = false
         model.openLesson = nil
         openWindow(id: WindowID.main)
+        dismissWindow(id: WindowID.lesson)
         await SpaceSwitcher(model: model, open: openSpace, dismiss: dismissSpace).close()
     }
 
