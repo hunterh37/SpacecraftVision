@@ -1,0 +1,55 @@
+name: VisionSpacecraft
+options:
+  bundleIdPrefix: org.dicyaninlabs
+  deploymentTarget:
+    visionOS: "26.0"
+  xcodeVersion: "26.0"
+packages:
+  RealityHD:
+    path: ../RealityHD
+  SpacecraftKit:
+    path: Packages/SpacecraftKit
+targets:
+  VisionSpacecraft:
+    type: application
+    platform: visionOS
+    sources:
+      - path: VisionSpacecraft
+    dependencies:
+      - package: RealityHD
+        product: RealityHD
+      - package: SpacecraftKit
+        product: SpacecraftCore
+      - package: SpacecraftKit
+        product: FlightSim
+      - package: SpacecraftKit
+        product: FlightCode
+      - package: SpacecraftKit
+        product: FlightRunner
+      - package: SpacecraftKit
+        product: Curriculum
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+        SWIFT_APPROACHABLE_CONCURRENCY: YES
+        PRODUCT_BUNDLE_IDENTIFIER: org.dicyaninlabs.visionspacecraft
+        DEVELOPMENT_TEAM: NWR2UZ4V67
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+        INFOPLIST_KEY_CFBundleDisplayName: "Vision Spacecraft"
+        GENERATE_INFOPLIST_FILE: YES
+    info:
+      path: Support/Info.plist
+      properties:
+        CFBundleDisplayName: Vision Spacecraft
+        ITSAppUsesNonExemptEncryption: false
+        UIApplicationSceneManifest:
+          UIApplicationPreferredDefaultSceneSessionRole: UIWindowSceneSessionRoleApplication
+          UIApplicationSupportsMultipleScenes: true
+          UISceneConfigurations: {}
+schemes:
+  VisionSpacecraft:
+    build:
+      targets:
+        VisionSpacecraft: all

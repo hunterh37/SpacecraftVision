@@ -1,4 +1,8 @@
 .DS_Store
 build/
 DerivedData/
+.build/
+.swiftpm/
 xcuserdata/
+*.xcodeproj/
+Packages/SpacecraftKit/.build/
