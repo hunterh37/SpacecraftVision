@@ -6,7 +6,7 @@ import FlightRunner
 import Curriculum
 import LabUI
 
-enum SpaceID: String { case workshop, range }
+enum SpaceID: String { case workshop, range, space }
 enum WindowID { static let main = "main", parts = "parts", code = "code", analysis = "analysis" }
 
 enum FlightView: String, CaseIterable, Identifiable {
@@ -30,6 +30,9 @@ final class AppModel {
 
     // Immersive
     var openSpace: SpaceID?
+    /// Follow a flight from the launch range into the space scene (once the craft has climbed, and at the end).
+    var followToSpace = true
+    var followedLaunch = -1
     var flightView: FlightView = .ground
 
     // Code
