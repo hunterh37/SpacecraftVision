@@ -26,7 +26,7 @@ final class AppModel {
     // Selection
     var mission: Mission = .m1 { didSet { if mission.id != oldValue.id { missionChanged() } } }
     var lesson: Lesson? = Lesson.all[0]
-    var craft: CraftDesign = .rHop()
+    var craft: CraftDesign = .rHop() { didSet { scheduleSave() } }
     var selectedStackPart: UUID?
     var workshopTabletop = false
 
@@ -43,7 +43,7 @@ final class AppModel {
     }
 
     // Code
-    var sources: [String: String] = [:]          // missionId -> source
+    var sources: [String: String] = [:] { didSet { scheduleSave() } }   // missionId -> source
     var compileStatus: CompileStatus = .idle
     var preview: FlightReport?
     var previewing = false
@@ -96,13 +96,21 @@ final class AppModel {
 
     // Lesson progress
     var lessonStage: LessonStage = .implement
-    var answers: [Int: Int] = [:]
+    var answers: [Int: Int] = [:] { didSet { scheduleSave() } }
     var pseudocodePassed: Set<Int> = []
-    var completed: [Int: Int] = [:]   // lesson id -> stars
+    var completed: [Int: Int] = [:] { didSet { scheduleSave() } }   // lesson id -> stars
+
+    /// Recorded flights (specs/11), newest last; persisted with `SaveState`.
+    var records: [FlightRecord] = [] { didSet { scheduleSave() } }
+    /// Runs chosen for overlay in the analysis window (up to 4).
+    var compareIds: [UUID] = []
+    private var saveTask: Task<Void, Never>?
+    private var loaded = false
 
     init() {
         craft = .rHop()
         craft.payloadMass = mission.payloadMass
+        load()
         syncTaskGuideSnapshot()
         schedulePreview()
     }
@@ -324,6 +332,7 @@ final class AppModel {
             lastCommands = cmds
             reports.append(report)
             if reports.count > 10 { reports.removeFirst() }
+            recordFlight(report)
         }
         flight.launch(source: source, craft: craft, mission: mission)
     }
@@ -332,13 +341,54 @@ final class AppModel {
 
     func grade(_ l: Lesson) -> (score: Int, stars: Int, tests: [HiddenTestResult])? {
         guard let rep = lastReport, rep.result.passed, mission.id == l.missionId else { return nil }
-        let tests = l.hiddenTests(lastCommands)
-        let testScore = tests.isEmpty ? 40.0 : 40.0 * Double(tests.filter(\.passed).count) / Double(tests.count)
-        let fuel = 20 * min(1, l.mission.parFuel / max(rep.result.fuelUsed, 1))
-        let apo = 20 * max(0, 1 - abs(rep.result.apogee - 1100) / 100)
-        let ans = answers[l.id] == l.question.answer ? 20.0 : 0
-        let score = Int((testScore + fuel + apo + ans).rounded())
-        let stars = score >= 95 ? 3 : score >= 80 ? 2 : score >= 60 ? 1 : 0
-        return (score, stars, tests)
+        let unit = l.unitTests(source: source)
+        let tests = unit.isEmpty ? l.hiddenTests(lastCommands) : unit
+        let r = rep.result
+        let run = RunSummary(passed: r.passed, fuelUsed: r.fuelUsed, energyUsedWh: r.energyUsedWh, minClearance: r.minClearance,
+                             apogee: r.apogee, flightScore: r.score)
+        guard let g = Grading.grade(l, run: run, tests: tests, answerCorrect: answers[l.id] == l.question.answer) else { return nil }
+        return (g.score, g.stars, g.tests)
+    }
+
+    // MARK: Records and save/load (specs/11)
+
+    func recordFlight(_ report: FlightReport) {
+        let n = records.filter { $0.missionId == mission.id }.count + 1
+        let r = FlightRecord(name: "\(mission.id) run \(n)", missionId: mission.id, courseId: mission.courseId, seed: 1,
+                             craft: craft, source: source, report: report)
+        records.append(r)
+        if records.count > 40 { records.removeFirst(records.count - 40) }
+    }
+
+    var saveState: SaveState {
+        var s = SaveState()
+        s.crafts = [craft]; s.currentCraftId = craft.id; s.missionId = mission.id; s.sources = sources
+        s.progress = completed.map { SaveState.Progress(lessonId: $0.key, stars: $0.value) }.sorted { $0.lessonId < $1.lessonId }
+        s.answers = answers
+        s.records = records
+        return s
+    }
+
+    func load() {
+        defer { loaded = true }
+        guard let s = SaveState.read() else { return }
+        if let m = s.missionId.flatMap(Mission.named) { mission = m }
+        if let c = s.crafts.first(where: { $0.id == s.currentCraftId }) ?? s.crafts.first { craft = c }
+        sources.merge(s.sources) { _, b in b }
+        for p in s.progress { completed[p.lessonId] = p.stars }
+        answers.merge(s.answers) { _, b in b }
+        records = s.records
+    }
+
+    /// Debounced autosave after any persisted change.
+    func scheduleSave() {
+        guard loaded else { return }
+        saveTask?.cancel()
+        saveTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1))
+            guard let self, !Task.isCancelled else { return }
+            let state = saveState
+            await Task.detached(priority: .utility) { try? state.write() }.value
+        }
     }
 }

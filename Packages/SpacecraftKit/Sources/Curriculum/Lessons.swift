@@ -51,6 +51,9 @@ public struct Lesson: Sendable, Identifiable, Hashable {
     public static func == (a: Lesson, b: Lesson) -> Bool { a.id == b.id }
     public func hash(into h: inout Hasher) { h.combine(id) }
 
+    /// Hidden unit tests run on the player's code (lessons 2 to 9); empty for lessons graded on the command stream.
+    public func unitTests(source: String) -> [HiddenTestResult] { HiddenTests.run(lesson: id, source: source) }
+
     public func hiddenTests(_ cmds: [CommandRecord]) -> [HiddenTestResult] {
         switch id {
         case 0:
@@ -133,5 +136,24 @@ public struct Lesson: Sendable, Identifiable, Hashable {
                 plot: ["bearing_deg"],
                 options: ["Bearing overshoots more after each gate", "Bearing settles faster",
                           "Nothing changes", "The craft climbs higher"], answer: 0)),
+        Lesson(id: 3, title: "Reactive avoidance", subtitle: "Bug 0 around walls", missionId: "M2B",
+               narration: [
+                "The rover knows where home is. It does not have a map.",
+                "Rule one: drive toward the goal.",
+                "Rule two: if something is closer than a safe distance ahead, turn toward the more open side.",
+                "Rule three: as soon as the way to the goal is clear, head for the goal again.",
+                "This is Bug 0. Steer three rovers home by hand, then watch the rule do it.",
+               ],
+               blocks: ["loop every tick", "if obstacle closer than SAFE_DIST ahead: turn toward the open side",
+                        "else: head to goal"],
+               distractors: ["if obstacle closer than SAFE_DIST: stop the engine"],
+               starterCode: LessonCode.l3Starter, referenceCode: LessonCode.l3Reference,
+               question: AnalysisQuestion(
+                prompt: "Fly with SAFE_DIST doubled. Which constant sets the minimum clearance, and what happens to fuel?",
+                plot: ["front_range"],
+                options: ["SAFE_DIST; fuel used rises because the craft turns earlier and flies a longer path",
+                          "SAFE_DIST; fuel used falls because the craft slows down",
+                          "TURN_DEG; fuel used does not change",
+                          "CRUISE_ALT; fuel used rises because the craft climbs"], answer: 0)),
     ]
 }

@@ -43,6 +43,18 @@ public final class VM {
         _ = try run(program.module, args: [], budget: Self.setupBudget)
     }
 
+    /// Read a module-level variable (hidden tests).
+    public func global(_ name: String) -> Value? {
+        guard let i = program.globalIndex[name], i < globals.count else { return nil }
+        return globals[i]
+    }
+
+    /// Overwrite a module-level variable (hidden tests set gains and state).
+    public func setGlobal(_ name: String, _ v: Value) {
+        guard let i = program.globalIndex[name], i < globals.count else { return }
+        globals[i] = v
+    }
+
     public func hasFunction(_ name: String) -> Bool {
         if let i = program.globalIndex[name], i < globals.count, case .function = globals[i] { return true }
         return false
