@@ -1,4 +1,5 @@
 import SwiftUI
+import LabUI
 
 /// Builds `TourActions` from the view environment.
 struct TourActionsReader<Content: View>: View {

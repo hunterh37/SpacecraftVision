@@ -87,7 +87,7 @@ public struct CodeWorkspace: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .padding(18)
-        .labPanel(variant: model.tab == .python ? .dusk : .tide)
+        .labPanel(tint: errorText == nil ? Brand.telemetry : Lab.danger, variant: model.tab == .python ? .dusk : .tide)
         .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width = $0 }
         .onChange(of: model.tab) { _, t in if t == .trace { Task { await model.runTrace() } } }
     }
@@ -108,10 +108,12 @@ public struct CodeWorkspace: View {
         }
     }
 
+    /// Brand-style mono caption: a short tinted rule, then the state in tracked capitals.
     private var statusDot: some View {
-        HStack(spacing: 6) {
-            Circle().fill(errorText == nil ? Lab.teal : Lab.danger).frame(width: 8, height: 8).shadow(color: errorText == nil ? Lab.teal : Lab.danger, radius: 5)
-            Text(errorText == nil ? "Compiles" : "Error in your code").font(Lab.soft(12)).foregroundStyle(Lab.muted)
+        let tint = errorText == nil ? Brand.telemetry : Lab.danger
+        return HStack(spacing: 8) {
+            Rectangle().fill(tint).frame(width: 22, height: 3).clipShape(Capsule())
+            Text(errorText == nil ? "COMPILES" : "ERROR IN YOUR CODE").font(Brand.label(11)).tracking(2).foregroundStyle(tint)
         }
     }
 
