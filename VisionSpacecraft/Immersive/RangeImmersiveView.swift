@@ -18,11 +18,12 @@ struct RangeImmersiveView: View {
 
     var body: some View {
         RealityView { content, attachments in
-            if let env = try? RealEnvironment({ var s = model.mission.course.timeOfDay == .morning ? SunSky.morning : SunSky.afternoon
-                                                s.fogDensity = 0.00015; return s }(), skybox: true, skyboxRadius: 6000) {
+            // Every mission is flown in space: star sphere, planet, sun light, no atmosphere haze.
+            if let env = SpaceBackdrop.environment() {
                 content.add(env.root)
                 scene.env = env
             }
+            content.add(SpaceBackdrop.sky())
             content.add(scene.skyHolder)
             content.add(scene.lightHolder)
             scene.updateSky(style: model.skyStyle, timeOfDay: model.mission.course.timeOfDay)
@@ -52,6 +53,7 @@ struct RangeImmersiveView: View {
                 scene.updateCraft(model.flight, view: model.flightView, course: model.mission.course, dt: e.deltaTime)
                 model.walkthrough.tick(e.deltaTime, model: model)
                 scene.updateIndicators(model, dt: Float(e.deltaTime))
+                SpaceBackdrop.tumble(scene.asteroidHolder, dt: Float(e.deltaTime))
             }
         } update: { _, _ in
         } attachments: {
@@ -112,6 +114,7 @@ final class RangeScene {
     let courseHolder = Entity()
     let craftHolder = Entity()    // positioned by the sim
     let ribbonHolder = Entity()
+    let asteroidHolder = Entity()
     var craftModel: Entity?
     var plume: ModelEntity?
     var drogue: ModelEntity?
@@ -137,7 +140,9 @@ final class RangeScene {
         root.addChild(courseHolder)
         root.addChild(ribbonHolder)
         root.addChild(craftHolder)
+        root.addChild(asteroidHolder)
         root.addChild(indicators.course)
+        SpaceBackdrop.Tumble.registerComponent()
     }
 
     func updateSky(style: SkyStyle, timeOfDay: TimeOfDay) {
@@ -177,22 +182,21 @@ final class RangeScene {
     func buildStatic(course: Course) async {
         if !builtStatic {
             builtStatic = true
-            // Desert floor.
-            let ground = ModelEntity(mesh: .generatePlane(width: 6000, depth: 6000), materials: [PartMeshFactory.paint(0xC2A27A, rough: 0.95)])
-            ground.position = [0, -0.02, 0]
-            staticHolder.addChild(ground)
+            // Regolith deck and the planet below it, in place of the desert floor.
+            staticHolder.addChild(SpaceBackdrop.deck())
+            staticHolder.addChild(SpaceBackdrop.planet())
             staticHolder.addChild(await PartMeshFactory.entity("launch-pad").withPosition([0, -0.6, 0]))
             staticHolder.addChild(await PartMeshFactory.entity("launch-tower").withPosition([3.2, 0, 0]))
             staticHolder.addChild(await PartMeshFactory.entity("viewing-platform").withPosition([0, 0, 60]))
-            // Existing RealityHD environment assets.
+            // Surface rocks from RealityHD, dark and dusty.
             var rng = SplitMix64(seed: 42)
-            for i in 0..<28 {
+            for i in 0..<18 {
                 let a = rng.unit() * 2 * .pi, d = 40 + rng.unit() * 380
                 let p = SIMD3<Float>(Float(cos(a) * d), 0, Float(sin(a) * d))
                 if abs(p.x) < 15 && p.z > -20 && p.z < 80 { continue }
-                if let e = try? await RealityHD.entity(i % 3 == 0 ? "boulder" : "shrub", seed: UInt64(i + 1)) {
+                if let e = try? await RealityHD.entity("boulder", seed: UInt64(i + 1)) {
                     e.position = p
-                    e.scale = .init(repeating: i % 3 == 0 ? Float(1.5 + rng.unit() * 2) : 1)
+                    e.scale = .init(repeating: Float(1.5 + rng.unit() * 2))
                     staticHolder.addChild(e)
                 }
             }
@@ -206,6 +210,21 @@ final class RangeScene {
         builtCourse = course.id
         courseHolder.children.removeAll()
         gateBeacons.removeAll()
+        // Asteroid field around the course, kept off the pad, the platform and every gate.
+        asteroidHolder.children.removeAll()
+        var clear: [(SIMD3<Float>, Float)] = [([0, 0, 0], 120), ([0, 0, 60], 60)]
+        for g in course.gates { clear.append((rk(g.centre), Float(g.innerRadius) * 6 + 30)) }
+        if let zone = course.landingZone { clear.append((rk(zone.centre), Float(zone.radius) + 60)) }
+        clear.append((rk(course.goal), 80))
+        // Clear tube along pad -> gates -> goal and a column above the pad, so rocks never sit on the flown line.
+        let line = [Vec3.zero, Vec3(0, 0, 400)] + course.gates.map(\.centre) + [course.goal]
+        for (a, b) in zip(line, line.dropFirst()) {
+            let n = max(1, Int(simd_len(b - a) / 40))
+            for k in 0...n { clear.append((rk(a + (b - a) * Double(k) / Double(n)), 90)) }
+        }
+        for z in stride(from: 0.0, through: course.extent.z, by: 60) { clear.append((rk(Vec3(0, 0, z)), 110)) }
+        let ext = SIMD3<Float>(Float(course.extent.x), Float(course.extent.y), Float(course.extent.z))
+        asteroidHolder.addChild(SpaceBackdrop.asteroids(extent: ext, keepClear: clear, seed: course.id.utf8.reduce(7) { $0 &* 31 &+ UInt64($1) }))
         // Landing zone pylons.
         if let zone = course.landingZone {
             for k in 0..<8 {
@@ -238,6 +257,7 @@ final class RangeScene {
             courseHolder.addChild(finish)
         }
         env?.illuminate(courseHolder)
+        env?.illuminate(asteroidHolder)
     }
 
     func rebuildCraft(_ craft: CraftDesign) async {
