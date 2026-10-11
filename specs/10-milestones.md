@@ -8,4 +8,4 @@
 | M3 | FlightCode: Python subset, VM, craft API, editor, preview ribbon | Lesson 0 and 1 starter code compiles and flies; edit-to-ribbon under 1 s |
 | M4 | C subset, lessons 2 to 5, mini games, grading | 5 lessons playable end to end |
 | M5 | Analysis window, run compare, export, audio, lighting polish, aircraft parts and lift model | M4 field flown by aircraft; 90 fps on device |
-| M6 | Lessons 6 to 10, walkthrough, settings, TestFlight | PEEP audit above threshold; TestFlight build live |
+| M6 | Lessons 6 to 10, walkthrough, settings, TestFlight | `/vision-audit` score 80% or higher; TestFlight build live |
