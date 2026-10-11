@@ -131,6 +131,18 @@ final class RangeScene {
     let asteroidHolder = Entity()
     var craftModel: Entity?
     var poser: CraftPoser?
+    var windsock: Entity?
+
+    /// Head yaw to the downwind direction, sock sag from speed: calm -76 deg, breeze -28 deg, level at 10 m/s.
+    func poseWindsock(_ wind: Wind) {
+        guard let windsock, !PartMeshFactory.isPlaceholder(windsock) else { return }
+        let v = wind.vector(altitude: 6)
+        let speed = Float(simd_len(v))
+        let d = rk(v)
+        let yaw = speed > 0.01 ? atan2(-d.z, d.x) * 180 / .pi : 0
+        let sag: Float = speed >= 10 ? 0 : speed >= 5 ? -28 + 28 * (speed - 5) / 5 : -76 + 48 * speed / 5
+        windsock.setJoints(["head": yaw, "sock": sag])
+    }
     var plume: ModelEntity?
     var drogue: ModelEntity?
     var mainChute: ModelEntity?
@@ -212,32 +224,49 @@ final class RangeScene {
     func buildStatic(course: Course) async {
         if !builtStatic {
             builtStatic = true
-            // Regolith deck and the planet below it, in place of the desert floor.
-            staticHolder.addChild(SpaceBackdrop.deck())
-            staticHolder.addChild(SpaceBackdrop.planet())
-            staticHolder.addChild(await PartMeshFactory.entity("launch-pad").withPosition([0, -0.6, 0]))
-            staticHolder.addChild(await PartMeshFactory.entity("launch-tower").withPosition([3.2, 0, 0]))
-            staticHolder.addChild(await PartMeshFactory.entity("viewing-platform").withPosition([0, 0, 60]))
-            // Surface rocks from RealityHD, dark and dusty.
-            var rng = SplitMix64(seed: 42)
-            for i in 0..<18 {
-                let a = rng.unit() * 2 * .pi, d = 40 + rng.unit() * 380
-                let p = SIMD3<Float>(Float(cos(a) * d), 0, Float(sin(a) * d))
-                if abs(p.x) < 15 && p.z > -20 && p.z < 80 { continue }
-                if let e = try? await RealityHD.entity("boulder", seed: UInt64(i + 1)) {
-                    e.position = p
-                    e.scale = .init(repeating: Float(1.5 + rng.unit() * 2))
-                    staticHolder.addChild(e)
+            // Base environment: RealityHD "aerospace-range" (pad, tower, blockhouse, runway, platform, scrub).
+            // Fallback: the regolith deck, planet and placeholder pad props.
+            if let range = try? await RealityHD.scene("aerospace-range", seed: 1) {
+                // Mount-ring top (deck 1 m - 0.05 sink + ring 1.2 m) at y = 0 where the craft stands, and the scene's
+                // viewing platform at (-42, 43) turned 44.3 deg onto the app's viewer line 60 m south of the pad.
+                range.position = [0, -2.15, 0]
+                range.orientation = simd_quatf(angle: atan2(42, 43), axis: [0, 1, 0])
+                staticHolder.addChild(range)
+            } else {
+                // Regolith deck and the planet below it, in place of the desert floor.
+                staticHolder.addChild(SpaceBackdrop.deck())
+                staticHolder.addChild(SpaceBackdrop.planet())
+                staticHolder.addChild(await PartMeshFactory.entity("launch-pad").withPosition([0, -0.6, 0]))
+                staticHolder.addChild(await PartMeshFactory.entity("launch-tower").withPosition([3.2, 0, 0]))
+                staticHolder.addChild(await PartMeshFactory.entity("viewing-platform").withPosition([0, 0, 60]))
+                // Surface rocks from RealityHD, dark and dusty.
+                var rng = SplitMix64(seed: 42)
+                for i in 0..<18 {
+                    let a = rng.unit() * 2 * .pi, d = 40 + rng.unit() * 380
+                    let p = SIMD3<Float>(Float(cos(a) * d), 0, Float(sin(a) * d))
+                    if abs(p.x) < 15 && p.z > -20 && p.z < 80 { continue }
+                    if let e = try? await RealityHD.entity("boulder", seed: UInt64(i + 1)) {
+                        e.position = p
+                        e.scale = .init(repeating: Float(1.5 + rng.unit() * 2))
+                        staticHolder.addChild(e)
+                    }
                 }
+                for (i, p) in [SIMD3<Float>(-4, 0, 57), [-4.8, 0, 56.4], [4.5, 0, 57.5]].enumerated() {
+                    if let e = try? await RealityHD.entity("oil-drum", seed: UInt64(i + 1)) { e.position = p; staticHolder.addChild(e) }
+                }
+                if let e = try? await RealityHD.entity("cable-spool", seed: 1) { e.position = [6, 0, 4]; staticHolder.addChild(e) }
             }
-            for (i, p) in [SIMD3<Float>(-4, 0, 57), [-4.8, 0, 56.4], [4.5, 0, 57.5]].enumerated() {
-                if let e = try? await RealityHD.entity("oil-drum", seed: UInt64(i + 1)) { e.position = p; staticHolder.addChild(e) }
-            }
-            if let e = try? await RealityHD.entity("cable-spool", seed: 1) { e.position = [6, 0, 4]; staticHolder.addChild(e) }
             env?.illuminate(staticHolder)
         }
         guard builtCourse != course.id else { return }
         builtCourse = course.id
+        // Live windsock beside the viewer, posed from the course wind (the scene's own sock is baked).
+        windsock?.removeFromParent()
+        let sock = await PartMeshFactory.entity("windsock")
+        sock.position = rk(Vec3(14, -52, 0))
+        staticHolder.addChild(sock)
+        windsock = sock
+        poseWindsock(course.wind)
         courseHolder.children.removeAll()
         gateBeacons.removeAll()
         // Asteroid field around the course, kept off the pad, the platform and every gate.
