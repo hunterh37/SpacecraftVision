@@ -26,7 +26,11 @@ public struct FlightPathView: View {
         self.report = report; self.course = course; self.live = live; _cursor = cursor; self.height = height; self.onScrubEnd = onScrubEnd
     }
 
-    private var samples: [FlightSample] { report?.samples ?? [] }
+    /// Forecast samples; when there is no usable forecast, the live flight so far, so a launch still draws.
+    private var samples: [FlightSample] {
+        if let s = report?.samples, s.count > 1 { return s }
+        return live?.samples ?? []
+    }
     private var events: [PathEvent] { PathEvent.parse(report?.events ?? []) }
     private var duration: Double { samples.last?.t ?? 1 }
     private var maxSpeed: Double { max(samples.map(\.speed).max() ?? 1, 1) }
@@ -47,7 +51,7 @@ public struct FlightPathView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             header
-            if samples.isEmpty {
+            if samples.count < 2 {
                 Text(report == nil ? "No flight to draw yet." : "The code does not fly yet, so there is no path.").font(Lab.soft(13)).foregroundStyle(Lab.muted)
                     .frame(maxWidth: .infinity, minHeight: height, alignment: .center)
             } else {

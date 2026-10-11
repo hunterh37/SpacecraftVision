@@ -10,6 +10,7 @@ public final class UnitHarness: VMHost {
     public var lidarAt: (Double) -> Double = { _ in -1 }
     public private(set) var commands: [(name: String, value: Double)] = []
     public private(set) var logs: [String] = []
+    private var rng: UInt64 = 0x2545F4914F6CDD1D
 
     public init(source: String) throws {
         let p = try Compiler.compile(source)
@@ -29,6 +30,9 @@ public final class UnitHarness: VMHost {
         case "stage": commands.append((name, 0)); return .none
         case "log": logs.append(args.map(\.repr).joined(separator: " ")); return .none
         case "plot": return .none
+        case "random" where values["random"] == nil:
+            rng = rng &* 6364136223846793005 &+ 1442695040888963407
+            return .float(Double(rng >> 11) / Double(1 << 53))
         case "lidar": return .float(lidarAt(args.first?.asDouble ?? 0))
         case "lidar_scan":
             if let v = values[name] { return v }

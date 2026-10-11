@@ -610,4 +610,470 @@ def update(dt):
         turn(GAIN * ang)
     craft.plot("force_angle_deg", math.degrees(math.atan2(fx, fy)))
 """#
+    static let l7Starter = #"""
+import craft
+import math
+
+G = 9.80665
+MAX_TILT = math.radians(15.0)
+CLIMB_RATE = 100.0   # m/s, the nominal ascent the debris table is timed for
+
+def wrap(a):
+    while a > math.pi:
+        a = a - 2.0 * math.pi
+    while a < -math.pi:
+        a = a + 2.0 * math.pi
+    return a
+
+def hold_climb(rate):
+    # Solids light on the first nonzero throttle and cannot stop; the liquid engine trims the rest.
+    vz = craft.velocity()[2]
+    if vz > rate + 3.0:
+        craft.set_throttle(0.0)
+    else:
+        craft.set_throttle(math.clamp(0.4 + 0.1 * (rate - vz), 0.4, 1.0))
+
+def tilt_to(east, north):
+    # tilt the thrust to give a horizontal acceleration (east, north) in m/s^2;
+    # leans back past vertical instead of turning the heading around
+    pitch, yaw, roll = craft.attitude()
+    mag = math.hypot(east, north)
+    if mag < 0.3:
+        craft.set_yaw(0.0)
+        craft.set_pitch(2.0 * (math.pi / 2.0 - pitch))
+        return
+    err = wrap(math.atan2(east, north) - yaw)
+    sign = 1.0
+    if abs(err) > math.pi / 2.0:
+        err = wrap(err + math.pi)
+        sign = -1.0
+    tilt = sign * math.clamp(math.atan2(mag, G), 0.0, MAX_TILT) * math.cos(err)
+    craft.set_yaw(math.clamp(2.0 * err, -0.5, 0.5))
+    craft.set_pitch(2.0 * ((math.pi / 2.0 - tilt) - pitch))
+
+# Lesson 7: velocity obstacles.
+# Pseudocode from stage 2:
+#   for each candidate horizontal velocity on a grid:
+#     for each radar track: find the closest approach within HORIZON s
+#     reject the candidate if any closest approach is under radius + MARGIN
+#   pick the allowed candidate nearest the preferred velocity
+#   tilt to reach it
+
+HORIZON = 0.0      # s. Tune this.
+MARGIN = 0.0       # m. Tune this.
+STEP = 6.0         # m/s between candidates
+RANGE = 600.0      # m, tracks farther than this are ignored
+
+def closest_approach(rp, u):
+    # rp: obstacle position relative to craft; u: obstacle velocity relative to candidate
+    # TODO: return the minimum distance over t in [0, HORIZON]
+    return 1.0e9
+
+def update(dt):
+    hold_climb(CLIMB_RATE)
+    p = craft.position()
+    v = craft.velocity()
+    pref_x = -0.05 * p[0]
+    pref_y = -0.05 * p[1]
+    tracks = []
+    for tr in craft.radar_tracks():
+        if math.hypot(tr[0][0], tr[0][1], tr[0][2]) < RANGE:
+            tracks.append(tr)
+    best = None
+    best_cost = 1.0e9
+    for ix in range(-3, 4):
+        for iy in range(-3, 4):
+            cx = ix * STEP
+            cy = iy * STEP
+            ok = True
+            for tr in tracks:
+                rp, rv, rad = tr
+                u = (v[0] + rv[0] - cx, v[1] + rv[1] - cy, rv[2])
+                if closest_approach(rp, u) < rad + MARGIN:
+                    ok = False
+                    break
+            if ok:
+                cost = math.hypot(cx - pref_x, cy - pref_y)
+                if cost < best_cost:
+                    best_cost = cost
+                    best = (cx, cy)
+    if best is None:
+        best = (pref_x, pref_y)
+        craft.log("no safe velocity")
+    tilt_to(0.5 * (best[0] - v[0]), 0.5 * (best[1] - v[1]))
+    craft.plot("tracks", len(tracks))
+"""#
+    static let l7Reference = #"""
+import craft
+import math
+
+G = 9.80665
+MAX_TILT = math.radians(15.0)
+CLIMB_RATE = 100.0   # m/s, the nominal ascent the debris table is timed for
+
+def wrap(a):
+    while a > math.pi:
+        a = a - 2.0 * math.pi
+    while a < -math.pi:
+        a = a + 2.0 * math.pi
+    return a
+
+def hold_climb(rate):
+    # Solids light on the first nonzero throttle and cannot stop; the liquid engine trims the rest.
+    vz = craft.velocity()[2]
+    if vz > rate + 3.0:
+        craft.set_throttle(0.0)
+    else:
+        craft.set_throttle(math.clamp(0.4 + 0.1 * (rate - vz), 0.4, 1.0))
+
+def tilt_to(east, north):
+    # tilt the thrust to give a horizontal acceleration (east, north) in m/s^2;
+    # leans back past vertical instead of turning the heading around
+    pitch, yaw, roll = craft.attitude()
+    mag = math.hypot(east, north)
+    if mag < 0.3:
+        craft.set_yaw(0.0)
+        craft.set_pitch(2.0 * (math.pi / 2.0 - pitch))
+        return
+    err = wrap(math.atan2(east, north) - yaw)
+    sign = 1.0
+    if abs(err) > math.pi / 2.0:
+        err = wrap(err + math.pi)
+        sign = -1.0
+    tilt = sign * math.clamp(math.atan2(mag, G), 0.0, MAX_TILT) * math.cos(err)
+    craft.set_yaw(math.clamp(2.0 * err, -0.5, 0.5))
+    craft.set_pitch(2.0 * ((math.pi / 2.0 - tilt) - pitch))
+
+# Lesson 7: velocity obstacles.
+# Pseudocode from stage 2:
+#   for each candidate horizontal velocity on a grid:
+#     for each radar track: find the closest approach within HORIZON s
+#     reject the candidate if any closest approach is under radius + MARGIN
+#   pick the allowed candidate nearest the preferred velocity
+#   tilt to reach it
+
+HORIZON = 8.0
+MARGIN = 20.0
+STEP = 6.0         # m/s between candidates
+RANGE = 600.0      # m, tracks farther than this are ignored
+
+def closest_approach(rp, u):
+    uu = u[0] * u[0] + u[1] * u[1] + u[2] * u[2]
+    t = 0.0
+    if uu > 1.0e-6:
+        t = -(rp[0] * u[0] + rp[1] * u[1] + rp[2] * u[2]) / uu
+        t = math.clamp(t, 0.0, HORIZON)
+    dx = rp[0] + u[0] * t
+    dy = rp[1] + u[1] * t
+    dz = rp[2] + u[2] * t
+    return math.sqrt(dx * dx + dy * dy + dz * dz)
+def update(dt):
+    hold_climb(CLIMB_RATE)
+    p = craft.position()
+    v = craft.velocity()
+    pref_x = -0.05 * p[0]
+    pref_y = -0.05 * p[1]
+    tracks = []
+    for tr in craft.radar_tracks():
+        if math.hypot(tr[0][0], tr[0][1], tr[0][2]) < RANGE:
+            tracks.append(tr)
+    best = None
+    best_cost = 1.0e9
+    for ix in range(-3, 4):
+        for iy in range(-3, 4):
+            cx = ix * STEP
+            cy = iy * STEP
+            ok = True
+            for tr in tracks:
+                rp, rv, rad = tr
+                u = (v[0] + rv[0] - cx, v[1] + rv[1] - cy, rv[2])
+                if closest_approach(rp, u) < rad + MARGIN:
+                    ok = False
+                    break
+            if ok:
+                cost = math.hypot(cx - pref_x, cy - pref_y)
+                if cost < best_cost:
+                    best_cost = cost
+                    best = (cx, cy)
+    if best is None:
+        best = (pref_x, pref_y)
+        craft.log("no safe velocity")
+    tilt_to(0.5 * (best[0] - v[0]), 0.5 * (best[1] - v[1]))
+    craft.plot("tracks", len(tracks))
+"""#
+    static let l9Starter = #"""
+import craft
+import math
+
+G = 9.80665
+MAX_TILT = math.radians(15.0)
+CLIMB_RATE = 100.0   # m/s, the nominal ascent the debris table is timed for
+
+def wrap(a):
+    while a > math.pi:
+        a = a - 2.0 * math.pi
+    while a < -math.pi:
+        a = a + 2.0 * math.pi
+    return a
+
+def hold_climb(rate):
+    # Solids light on the first nonzero throttle and cannot stop; the liquid engine trims the rest.
+    vz = craft.velocity()[2]
+    if vz > rate + 3.0:
+        craft.set_throttle(0.0)
+    else:
+        craft.set_throttle(math.clamp(0.4 + 0.1 * (rate - vz), 0.4, 1.0))
+
+def tilt_to(east, north):
+    # tilt the thrust to give a horizontal acceleration (east, north) in m/s^2;
+    # leans back past vertical instead of turning the heading around
+    pitch, yaw, roll = craft.attitude()
+    mag = math.hypot(east, north)
+    if mag < 0.3:
+        craft.set_yaw(0.0)
+        craft.set_pitch(2.0 * (math.pi / 2.0 - pitch))
+        return
+    err = wrap(math.atan2(east, north) - yaw)
+    sign = 1.0
+    if abs(err) > math.pi / 2.0:
+        err = wrap(err + math.pi)
+        sign = -1.0
+    tilt = sign * math.clamp(math.atan2(mag, G), 0.0, MAX_TILT) * math.cos(err)
+    craft.set_yaw(math.clamp(2.0 * err, -0.5, 0.5))
+    craft.set_pitch(2.0 * ((math.pi / 2.0 - tilt) - pitch))
+
+# Lesson 9: RRT in 3D with path smoothing.
+# Pseudocode from stage 2:
+#   tree = [craft position]
+#   repeat NODES times:
+#     sample a point (goal-biased) in the box ahead
+#     nearest = closest tree node; new = step STEP from nearest toward sample
+#     if the edge is clear of predicted obstacles: add new
+#   path = branch to the highest node; shortcut-smooth it; steer to the first waypoint
+
+NODES = 30
+STEP = 40.0          # m
+GOAL_BIAS = 0.0      # Tune this.
+MARGIN = 0.0         # m. Tune this.
+CLIMB = 100.0        # m/s, used to time obstacle positions
+AHEAD = 900.0        # m above the craft
+REPLAN = 1.0         # s
+SMOOTH_SPAN = 3      # nodes a shortcut may skip, keeps the tick in budget
+LEAD = 150.0         # m, steer to the path point this far above the craft
+KP_PATH = 0.1
+KD_PATH = 0.6
+
+rrt = {"path": [], "t_last": -100.0}
+
+def predicted_clear(x, y, z, t, tracks, p, v):
+    for tr in tracks:
+        rp, rv, rad = tr
+        ox = p[0] + rp[0] + (v[0] + rv[0]) * t
+        oy = p[1] + rp[1] + (v[1] + rv[1]) * t
+        oz = p[2] + rp[2] + (v[2] + rv[2]) * t
+        if math.sqrt((x - ox) ** 2 + (y - oy) ** 2 + (z - oz) ** 2) < rad + MARGIN:
+            return False
+    return True
+
+def edge_clear(a, b, tracks, p, v):
+    n = int(math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) / 40.0) + 1
+    for s in range(n + 1):
+        f = s / n
+        x = a[0] + (b[0] - a[0]) * f
+        y = a[1] + (b[1] - a[1]) * f
+        z = a[2] + (b[2] - a[2]) * f
+        if not predicted_clear(x, y, z, (z - p[2]) / max(v[2], CLIMB * 0.5), tracks, p, v):
+            return False
+    return True
+
+def build(p, v, tracks):
+    # TODO: grow the tree, return the smoothed path as a list of (x, y, z)
+    return []
+
+def path_point(path, z):
+    # Point on the path at altitude z (end points beyond its ends).
+    if z <= path[0][2]:
+        return path[0]
+    for i in range(len(path) - 1):
+        a = path[i]
+        b = path[i + 1]
+        if z <= b[2]:
+            f = (z - a[2]) / max(b[2] - a[2], 0.001)
+            return (a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, z)
+    return path[len(path) - 1]
+
+def update(dt):
+    hold_climb(CLIMB_RATE)
+    p = craft.position()
+    v = craft.velocity()
+    if craft.time() - rrt["t_last"] >= REPLAN:
+        rrt["t_last"] = craft.time()
+        near = []
+        for tr in craft.radar_tracks():
+            # rocks keep their altitude: plan only around those in the band ahead
+            if tr[0][2] > -20.0 and tr[0][2] < AHEAD + 50.0 and math.hypot(tr[0][0], tr[0][1]) < 400.0:
+                near.append(tr)
+        path = build(p, v, near)
+        if len(path) > 1:
+            rrt["path"] = path
+    if len(rrt["path"]) > 1:
+        w = path_point(rrt["path"], p[2] + LEAD)
+        tilt_to(KP_PATH * (w[0] - p[0]) - KD_PATH * v[0], KP_PATH * (w[1] - p[1]) - KD_PATH * v[1])
+    else:
+        tilt_to(-0.05 * p[0] - 0.3 * v[0], -0.05 * p[1] - 0.3 * v[1])
+"""#
+    static let l9Reference = #"""
+import craft
+import math
+
+G = 9.80665
+MAX_TILT = math.radians(15.0)
+CLIMB_RATE = 100.0   # m/s, the nominal ascent the debris table is timed for
+
+def wrap(a):
+    while a > math.pi:
+        a = a - 2.0 * math.pi
+    while a < -math.pi:
+        a = a + 2.0 * math.pi
+    return a
+
+def hold_climb(rate):
+    # Solids light on the first nonzero throttle and cannot stop; the liquid engine trims the rest.
+    vz = craft.velocity()[2]
+    if vz > rate + 3.0:
+        craft.set_throttle(0.0)
+    else:
+        craft.set_throttle(math.clamp(0.4 + 0.1 * (rate - vz), 0.4, 1.0))
+
+def tilt_to(east, north):
+    # tilt the thrust to give a horizontal acceleration (east, north) in m/s^2;
+    # leans back past vertical instead of turning the heading around
+    pitch, yaw, roll = craft.attitude()
+    mag = math.hypot(east, north)
+    if mag < 0.3:
+        craft.set_yaw(0.0)
+        craft.set_pitch(2.0 * (math.pi / 2.0 - pitch))
+        return
+    err = wrap(math.atan2(east, north) - yaw)
+    sign = 1.0
+    if abs(err) > math.pi / 2.0:
+        err = wrap(err + math.pi)
+        sign = -1.0
+    tilt = sign * math.clamp(math.atan2(mag, G), 0.0, MAX_TILT) * math.cos(err)
+    craft.set_yaw(math.clamp(2.0 * err, -0.5, 0.5))
+    craft.set_pitch(2.0 * ((math.pi / 2.0 - tilt) - pitch))
+
+# Lesson 9: RRT in 3D with path smoothing.
+# Pseudocode from stage 2:
+#   tree = [craft position]
+#   repeat NODES times:
+#     sample a point (goal-biased) in the box ahead
+#     nearest = closest tree node; new = step STEP from nearest toward sample
+#     if the edge is clear of predicted obstacles: add new
+#   path = branch to the highest node; shortcut-smooth it; steer to the first waypoint
+
+NODES = 30
+STEP = 40.0          # m
+GOAL_BIAS = 0.2
+MARGIN = 20.0
+CLIMB = 100.0        # m/s, used to time obstacle positions
+AHEAD = 900.0        # m above the craft
+REPLAN = 1.0         # s
+SMOOTH_SPAN = 3      # nodes a shortcut may skip, keeps the tick in budget
+LEAD = 150.0         # m, steer to the path point this far above the craft
+KP_PATH = 0.1
+KD_PATH = 0.6
+
+rrt = {"path": [], "t_last": -100.0}
+
+def predicted_clear(x, y, z, t, tracks, p, v):
+    for tr in tracks:
+        rp, rv, rad = tr
+        ox = p[0] + rp[0] + (v[0] + rv[0]) * t
+        oy = p[1] + rp[1] + (v[1] + rv[1]) * t
+        oz = p[2] + rp[2] + (v[2] + rv[2]) * t
+        if math.sqrt((x - ox) ** 2 + (y - oy) ** 2 + (z - oz) ** 2) < rad + MARGIN:
+            return False
+    return True
+
+def edge_clear(a, b, tracks, p, v):
+    n = int(math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) / 40.0) + 1
+    for s in range(n + 1):
+        f = s / n
+        x = a[0] + (b[0] - a[0]) * f
+        y = a[1] + (b[1] - a[1]) * f
+        z = a[2] + (b[2] - a[2]) * f
+        if not predicted_clear(x, y, z, (z - p[2]) / max(v[2], CLIMB * 0.5), tracks, p, v):
+            return False
+    return True
+
+def build(p, v, tracks):
+    nodes = [(p[0], p[1], p[2], -1)]
+    best = 0
+    for it in range(NODES):
+        if craft.random() < GOAL_BIAS:
+            s = (0.0, 0.0, p[2] + AHEAD)
+        else:
+            s = ((craft.random() - 0.5) * 300.0, (craft.random() - 0.5) * 300.0,
+                 p[2] + craft.random() * AHEAD)
+        ni = 0
+        nd = 1.0e9
+        for i in range(len(nodes)):
+            d = math.hypot(nodes[i][0] - s[0], nodes[i][1] - s[1], nodes[i][2] - s[2])
+            if d < nd:
+                nd = d
+                ni = i
+        a = nodes[ni]
+        f = min(1.0, STEP / max(nd, 0.001))
+        b = (a[0] + (s[0] - a[0]) * f, a[1] + (s[1] - a[1]) * f, a[2] + (s[2] - a[2]) * f)
+        if edge_clear(a, b, tracks, p, v):
+            nodes.append((b[0], b[1], b[2], ni))
+            if b[2] > nodes[best][2]:
+                best = len(nodes) - 1
+    raw = []
+    k = best
+    while k != -1:
+        raw.insert(0, (nodes[k][0], nodes[k][1], nodes[k][2]))
+        k = nodes[k][3]
+    path = [raw[0]]
+    i = 0
+    while i < len(raw) - 1:
+        j = min(len(raw) - 1, i + SMOOTH_SPAN)
+        while j > i + 1 and not edge_clear(raw[i], raw[j], tracks, p, v):
+            j = j - 1
+        path.append(raw[j])
+        i = j
+    return path
+def path_point(path, z):
+    # Point on the path at altitude z (end points beyond its ends).
+    if z <= path[0][2]:
+        return path[0]
+    for i in range(len(path) - 1):
+        a = path[i]
+        b = path[i + 1]
+        if z <= b[2]:
+            f = (z - a[2]) / max(b[2] - a[2], 0.001)
+            return (a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, z)
+    return path[len(path) - 1]
+
+def update(dt):
+    hold_climb(CLIMB_RATE)
+    p = craft.position()
+    v = craft.velocity()
+    if craft.time() - rrt["t_last"] >= REPLAN:
+        rrt["t_last"] = craft.time()
+        near = []
+        for tr in craft.radar_tracks():
+            # rocks keep their altitude: plan only around those in the band ahead
+            if tr[0][2] > -20.0 and tr[0][2] < AHEAD + 50.0 and math.hypot(tr[0][0], tr[0][1]) < 400.0:
+                near.append(tr)
+        path = build(p, v, near)
+        if len(path) > 1:
+            rrt["path"] = path
+    if len(rrt["path"]) > 1:
+        w = path_point(rrt["path"], p[2] + LEAD)
+        tilt_to(KP_PATH * (w[0] - p[0]) - KD_PATH * v[0], KP_PATH * (w[1] - p[1]) - KD_PATH * v[1])
+    else:
+        tilt_to(-0.05 * p[0] - 0.3 * v[0], -0.05 * p[1] - 0.3 * v[1])
+"""#
 }

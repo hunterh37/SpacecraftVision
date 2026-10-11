@@ -1072,7 +1072,12 @@ pi r².
 | D39 | -119 | 150 | 7,705 | 3.7 | 17.3 | 4.8 | 0.21 |
 | D40 | -26 | 91 | 7,816 | 2.4 | 0.7 | -21.5 | 0.65 |
 
-Pass: z = 10,000 m reached inside the corridor with no collision. Par: fuel 1,500 kg, clearance 40 m.
+Pass: z = 10,000 m reached inside the corridor with no collision. Par: fuel 1,500 kg, clearance 5 m (M4 tuning).
+
+M4 course change: R-debris climbs at about 200 m/s, so with the table as written no rock came near the
+craft and a starter with no avoidance passed. Each rock now sits at its listed position at the time the
+nominal R-debris ascent (solids plus liquid trimmed to 100 m/s) reaches its altitude (`Course.c6Ascent`),
+and listed x and y are divided by 20 so every rock crosses within about 12 m of the axis.
 
 ### Rocket helper block
 
@@ -1354,6 +1359,8 @@ Run against FlightSim with sensor noise on. Reference code as shipped lives in
 | L3 | C2B, R-walls | pass | 486 kg | 1.2 m |
 | L4 | C4, A-field | pass | 151 Wh | 14.6 m |
 | L5 | C4, A-field | pass | 134 Wh | 8.3 m |
+| L7 | C6, R-debris | pass | 1,200 kg | 5.1 m |
+| L9 | C6, R-debris | pass | 1,210 kg | 11.6 m |
 
 Changes from the drafts:
 - Rocket helpers (L2, L3): square-root braking altitude hold with engine cut below a 0.3 demand;
@@ -1369,3 +1376,11 @@ Changes from the drafts:
 - L5: K_ATT 2, K_REP 1.5e6, R0 120; only hits within 90 deg of the nose repel; four fine rays at
   ±5 and ±15 deg join the scan; at the saddle it turns 90 deg to the open side; attraction only
   inside 300 m of the gate.
+- Rocket helper (L7, L9): `hold_climb(CLIMB_RATE = 100)` replaces full throttle (the liquid engine cuts
+  above 103 m/s; solids stay lit); `tilt_to` leans back past vertical and holds vertical below 0.3 m/s².
+- L7: tracks beyond RANGE 600 m ignored, candidate grid range(-3, 4), MARGIN 20, HORIZON 8 (the 9 x 9
+  grid over 40 tracks exceeded the 100,000-instruction tick budget).
+- L9: plans only around rocks 0 to 950 m above and within 400 m; AHEAD 900, NODES 30, CLIMB 100,
+  MARGIN 20, SMOOTH_SPAN 3, edges sampled every 40 m; obstacle timing from the measured climb rate;
+  `t_last` set before the build so a budget fault does not re-plan every tick; steers to the path point
+  150 m above with KP_PATH 0.1, KD_PATH 0.6.

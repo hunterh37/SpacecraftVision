@@ -212,7 +212,7 @@ public struct Mission: Codable, Sendable, Hashable, Identifiable {
     public static let m6 = Mission(id: "M6", title: "Debris", lesson: 7, courseId: "C6", payloadMass: 50, massCap: 3_600, partCap: 20,
                                    budget: 34_000, energyCap: 2_500, fixedFuelLoad: nil,
                                    allowedParts: m2bParts + ["fuel-tank-l", "engine-solid-small", "radar-sensor", "camera-sensor"],
-                                   goal: .climb, parFuel: 1_500, parClearance: 40)
+                                   goal: .climb, parFuel: 1_500, parClearance: 5)
 
     /// Capstone on generated course `C7-<seed>`.
     public static func m7(seed: UInt64) -> Mission {

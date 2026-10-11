@@ -264,6 +264,19 @@ public extension Course {
         (-26, 91, 7816, 2.4, 0.7, -21.5, 0.65),
     ]
 
+    /// Nominal R-debris ascent (solids plus liquid trimmed to 100 m/s, held vertical): (altitude m, time s).
+    static let c6Ascent: [(Double, Double)] = [(0, 0), (112, 5), (452, 10), (962, 15), (1510, 20), (2094, 25), (2719, 30),
+                                               (3390, 35), (4111, 40), (4887, 45), (5722, 50), (6446, 55), (6939, 60),
+                                               (7410, 65), (7883, 70), (8356, 75), (8831, 80), (9307, 85), (9783, 90), (10260, 95)]
+
+    /// Time the nominal ascent reaches altitude z; debris sit at their listed position then.
+    static func c6AscentTime(_ z: Double) -> Double {
+        for (a, b) in zip(c6Ascent, c6Ascent.dropFirst()) where z <= b.0 {
+            return a.1 + (b.1 - a.1) * (z - a.0) / (b.0 - a.0)
+        }
+        return z / 100
+    }
+
     static let c6 = Course(id: "C6", extent: Vec3(3000, 3000, 10500),
                            corridor: .tube(from: .zero, to: Vec3(0, 0, 10500), radius: 1500),
                            gates: [], finishY: nil, landingZone: nil,
@@ -271,7 +284,9 @@ public extension Course {
                            wind: Wind(fromDeg: 270, speed: 6, gustSigma: 1.0, seed: 6006), timeOfDay: .morning,
                            goal: Vec3(0, 0, 10000),
                            obstacles: c6Debris.enumerated().map { i, d in
-                               .debris(String(format: "D%02d", i + 1), Vec3(d.0, d.1, d.2), radius: d.3, vx: d.4, vy: d.5, spin: d.6)
+                               var o = Obstacle.debris(String(format: "D%02d", i + 1), Vec3(d.0 / 20, d.1 / 20, d.2), radius: d.3, vx: d.4, vy: d.5, spin: d.6)
+                               o.refTime = c6AscentTime(d.2)
+                               return o
                            },
                            finishZ: 10000)
 }

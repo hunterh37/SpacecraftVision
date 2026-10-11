@@ -151,5 +151,64 @@ public enum HiddenTests {
                 return (h.entry("pf", "escape_until")?.number ?? -1) > 20
             }),
         ],
+        7: [
+            ("test_cpa_head_on", { h in
+                h.set("HORIZON", 20)
+                return near(h.call("closest_approach", [.vec(100, 0, 0), .vec(-10, 0, 0)])?.number, 0, 1e-6)
+            }),
+            ("test_cpa_receding_is_now", { h in
+                h.set("HORIZON", 20)
+                return near(h.call("closest_approach", [.vec(50, 0, 0), .vec(10, 0, 0)])?.number, 50, 1e-6)
+            }),
+            ("test_cpa_clamped_to_horizon", { h in
+                h.set("HORIZON", 5)
+                return near(h.call("closest_approach", [.vec(100, 0, 0), .vec(-10, 0, 0)])?.number, 50, 1e-6)
+            }),
+            ("test_candidate_rejected_in_cone", { h in
+                h.set("HORIZON", 8); h.set("MARGIN", 20)
+                // Candidate closing at 12 m/s on a 5 m rock 60 m away: closest approach 0, inside the cone.
+                return (h.call("closest_approach", [.vec(60, 0, 0), .vec(-12, 0, 0)])?.number ?? 99) < 25
+            }),
+            ("test_pick_nearest_preferred", { h in
+                h.values["position"] = .vec(0, 0, 3000); h.values["velocity"] = .vec(0, 0, 100)
+                h.call("update", [.float(0.02)])
+                return near(h.last("set_yaw"), 0, 1e-9) && !h.logs.contains("no safe velocity")
+            }),
+        ],
+        9: [
+            ("test_tree_grows_from_start", { h in
+                let path = h.call("build", [.vec(10, 20, 3000), .vec(0, 0, 100), .list(ListRef([]))])?.items ?? []
+                let first = path.first?.items.compactMap(\.number) ?? []
+                return first.count == 3 && near(first[0], 10) && near(first[1], 20) && near(first[2], 3000)
+            }),
+            ("test_edge_rejects_predicted_hit", { h in
+                let rock: Value = .tuple([.vec(0, 0, 100), .vec(0, 0, -100), .float(5)])
+                let ok = h.call("edge_clear", [.vec(0, 0, 0), .vec(0, 0, 200), .list(ListRef([rock])), .vec(0, 0, 0), .vec(0, 0, 100)])
+                return ok?.truthy == false
+            }),
+            ("test_goal_bias_rate", { h in
+                let path = h.call("build", [.vec(0, 0, 3000), .vec(0, 0, 100), .list(ListRef([]))])?.items ?? []
+                let top = path.last?.items.compactMap(\.number).last ?? 0
+                return top > 3000 + 200
+            }),
+            ("test_smoothing_keeps_clear_path", { h in
+                let rock: Value = .tuple([.vec(0, 0, 300), .vec(0, 0, -100), .float(6)])
+                let tracks: Value = .list(ListRef([rock]))
+                let path = h.call("build", [.vec(0, 0, 3000), .vec(0, 0, 100), tracks])?.items ?? []
+                guard path.count >= 2 else { return false }
+                for (a, b) in zip(path, path.dropFirst()) {
+                    if h.call("edge_clear", [a, b, tracks, .vec(0, 0, 3000), .vec(0, 0, 100)])?.truthy != true { return false }
+                }
+                return true
+            }),
+            ("test_budget_per_tick", { h in
+                let rocks = (0..<40).map { i -> Value in
+                    .tuple([.vec(Double(i % 7) * 30 - 90, Double(i % 5) * 30 - 60, Double(i) * 200 + 50), .vec(5, -3, -100), .float(5)])
+                }
+                h.values["radar_tracks"] = .list(ListRef(rocks))
+                h.values["position"] = .vec(0, 0, 3000); h.values["velocity"] = .vec(0, 0, 100)
+                return h.call("update", [.float(0.02)]) != nil
+            }),
+        ],
     ]
 }
