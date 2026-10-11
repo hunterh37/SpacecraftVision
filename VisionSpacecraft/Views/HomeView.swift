@@ -1,5 +1,6 @@
 import SwiftUI
 import LabUI
+import FlightRunner
 import SpacecraftCore
 import Curriculum
 
@@ -129,6 +130,7 @@ private struct ModeView: View {
     @Environment(\.dismissImmersiveSpace) private var dismissSpace
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismiss) private var dismiss
+    @State private var pathCursor = 3.0
 
     var switcher: SpaceSwitcher { SpaceSwitcher(model: model, open: openSpace, dismiss: dismissSpace) }
 
@@ -183,23 +185,54 @@ private struct ModeView: View {
     }
 
     private var missions: some View {
-        ForEach(Mission.all) { m in
-            LabRow(index: m.id, title: m.title, detail: summary(m), tint: mode.tint, selected: model.mission.id == m.id) {
-                HStack {
-                    Button("Code") {
-                        model.mission = m
-                        model.missionPicked = true
-                        openWindow(id: WindowID.code)
+        VStack(spacing: 14) {
+            trajectoryPanel
+            ForEach(Mission.all) { m in
+                LabRow(index: m.id, title: m.title, detail: summary(m), tint: mode.tint, selected: model.mission.id == m.id) {
+                    HStack {
+                        Button("Code") {
+                            model.mission = m
+                            model.missionPicked = true
+                            openWindow(id: WindowID.code)
+                        }
+                        .buttonStyle(LabSecondaryButtonStyle(tint: mode.tint))
+                        Button("Fly") {
+                            model.mission = m
+                            model.missionPicked = true
+                            Task { await switcher.show(.range) }
+                        }
+                        .buttonStyle(BrandButtonStyle())
                     }
-                    Button("Fly") {
-                        model.mission = m
-                        model.missionPicked = true
-                        Task { await switcher.show(.range) }
-                    }
-                    .buttonStyle(BrandButtonStyle())
                 }
+                .onTapGesture { model.mission = m; model.missionPicked = true }
             }
-            .onTapGesture { model.mission = m; model.missionPicked = true }
+        }
+    }
+
+    /// The selected mission's flight as the simulator forecasts it with the current code: speed-coloured path, events, the
+    /// rocket at the cursor, and the real rocket on top while a launch runs. Selecting another mission redraws it.
+    private var trajectoryPanel: some View {
+        let m = model.mission
+        let report = model.preview.flatMap { $0.compileError == nil ? $0 : nil }
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                LabCaption("Trajectory · \(m.id) \(m.title)", tint: mode.tint)
+                Spacer()
+                forecastChip(report)
+            }
+            FlightPathView(report: report, course: m.course, live: model.liveFlight, cursor: $pathCursor, height: 190)
+        }
+        .padding(20)
+        .labCard(corner: 26, tint: mode.tint, variant: .ember, aurora: 0.18)
+    }
+
+    @ViewBuilder private func forecastChip(_ report: FlightReport?) -> some View {
+        if let f = report?.result.failure {
+            Label(f.title.uppercased(), systemImage: "exclamationmark.triangle").font(Brand.label(11)).tracking(1.5).foregroundStyle(Brand.ignition)
+        } else if let r = report?.result {
+            Label("FORECAST: PASS · APOGEE \(Int(r.apogee)) M", systemImage: "checkmark.seal").font(Brand.label(11)).tracking(1.5).foregroundStyle(Brand.telemetry)
+        } else {
+            Text("NO FORECAST").font(Brand.label(11)).tracking(1.5).foregroundStyle(Brand.dim)
         }
     }
 
