@@ -531,7 +531,7 @@ struct FollowToSpace: ViewModifier {
 
     var shouldFollow: Bool {
         let f = model.flight
-        guard model.followToSpace, model.openSpace == .range, model.followedLaunch != f.launchID, f.phase != .idle else { return false }
+        guard model.followToSpace, !model.learnActive, model.openSpace == .range, model.followedLaunch != f.launchID, f.phase != .idle else { return false }
         let climb = max(120, 0.45 * (model.preview?.result.apogee ?? 500))
         return f.phase == .finished || f.altitude >= climb
     }

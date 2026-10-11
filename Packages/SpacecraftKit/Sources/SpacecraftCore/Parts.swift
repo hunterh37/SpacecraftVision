@@ -129,7 +129,7 @@ public enum PartCatalog {
         p("fin-trapezoid", "Fin", .aero, .radial, dry: 9, dia: 0.6, len: 0.9, cost: 300, unlock: 0,
           material: "aluminum", maxT: 600, maxG: 30, maxQ: 60, joint: (5, 3), area: 0.012, cd: (0.10, 0.40),
           source: "Barrowman method, OpenRocket fin drag"),
-        p("wing-section", "Wing section", .aero, .radial, dry: 27, dia: 3.9, len: 1.4, cost: 700, unlock: 4,
+        p("wing-section", "Wing section", .aero, .radial, dry: 27, dia: 4.04, len: 1.4, cost: 700, unlock: 4,
           material: "composite", maxT: 450, maxG: 6, maxQ: 6, joint: (5, 15), area: 4.49, cd: (0.008, 0.008),
           source: "OpenVSP VSPAERO tables; light composite airframe 6 kg/m²"),
         p("elevon", "Elevon", .aero, .radial, dry: 4, dia: 1.0, len: 0.3, cost: 400, unlock: 4,

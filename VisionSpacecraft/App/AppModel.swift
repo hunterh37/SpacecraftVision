@@ -70,6 +70,10 @@ final class AppModel {
     // Walkthrough signals (Walkthrough/WalkthroughModel.swift predicates and demos)
     var homePath = NavigationPath()
     var openLesson: Lesson?
+    /// Learn mode runs inside the range: the 3D lesson deck replaces the main window.
+    var learnActive = false
+    /// First lesson without stars, else the last one.
+    var nextLesson: Lesson { Lesson.all.first { completed[$0.id] == nil } ?? Lesson.all[Lesson.all.count - 1] }
     var pseudocodeDemo = 0
     var codeOpened = false
     var missionPicked = false
