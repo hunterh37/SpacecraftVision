@@ -5,27 +5,29 @@ import Curriculum
 /// (aurora streaks, light shaft, stars, grain, frame lines), because the app sits over passthrough
 /// and has no page background to borrow depth from.
 public enum Lab {
-    // Surfaces
-    public static let navy = Color(red: 0.027, green: 0.031, blue: 0.149)
-    public static let navyHigh = Color(red: 0.071, green: 0.090, blue: 0.373)
-    public static let ink = Color(red: 0.925, green: 0.933, blue: 1.0)
+    // Surfaces and accents come from `Brand`, so the app and the coding surfaces share one palette.
+    public static let navy = Brand.space
+    public static let hull = Brand.hull
+    public static let ink = Brand.ink
     public static let muted = Color(red: 0.76, green: 0.80, blue: 0.96)
     public static let faint = Color(red: 0.42, green: 0.45, blue: 0.68)
     public static let edge = Color(red: 0.67, green: 0.71, blue: 1.0)
-    public static let gold = Color(red: 1.0, green: 0.77, blue: 0.51)
-    public static let ember = Color(red: 1.0, green: 0.46, blue: 0.31)
-
-    // Accents
-    public static let teal = Color(red: 0.365, green: 1.0, blue: 0.769)
-    public static let violet = Color(red: 0.482, green: 0.447, blue: 1.0)
+    public static let teal = Brand.telemetry          // telemetry cyan
+    public static let violet = Brand.trajectory
+    public static let amber = Brand.ignition
+    public static let ember = Brand.ignition
+    public static let gold = Brand.ignition
     public static let pink = Color(red: 1.0, green: 0.478, blue: 0.784)
-    public static let amber = Color(red: 1.0, green: 0.702, blue: 0.361)
     public static let danger = Color(red: 1.0, green: 0.416, blue: 0.353)
 
-    // Fonts. Custom faces fall back to the system face when the bundle does not carry them.
-    public static func display(_ size: CGFloat) -> Font { .custom("PoleaExtraBoldDEMO", size: size, relativeTo: .title) }
-    public static func label(_ size: CGFloat) -> Font { .custom("Nebula", size: size, relativeTo: .caption) }
-    public static func soft(_ size: CGFloat) -> Font { .custom("KreganDEMO-Regular", size: size, relativeTo: .body) }
+    // Fonts. The licensed brand faces are used when the app bundle carries them; otherwise Brand's own
+    // system faces take over, so the look stays coherent either way.
+    private static func face(_ name: String, _ size: CGFloat, _ style: Font.TextStyle, fallback: Font) -> Font {
+        PlatformFont(name: name, size: size) != nil ? .custom(name, size: size, relativeTo: style) : fallback
+    }
+    public static func display(_ size: CGFloat) -> Font { face("PoleaExtraBoldDEMO", size, .title, fallback: Brand.display(size)) }
+    public static func label(_ size: CGFloat) -> Font { face("Nebula", size, .caption, fallback: Brand.label(size)) }
+    public static func soft(_ size: CGFloat) -> Font { face("KreganDEMO-Regular", size, .body, fallback: .system(size: size, weight: .semibold, design: .rounded)) }
     public static func mono(_ size: CGFloat) -> Font { .system(size: size, design: .monospaced) }
 
     // Blocks (Scratch-like hues)
@@ -69,14 +71,20 @@ struct SplitMix: Sendable {
 }
 
 public enum AuroraVariant: Sendable {
-    case dusk, tide
+    /// Cyan to violet: the default for code and trace surfaces.
+    case dusk
+    /// Cyan, green, blue: calm, used for block editing.
+    case tide
+    /// Orange, pink, violet: warm, for missions and flight.
+    case ember
     var palette: [Color] {
         switch self {
-        case .dusk: [Lab.teal, Color(red: 0.36, green: 0.55, blue: 1.0), Color(red: 0.75, green: 0.43, blue: 1.0), Lab.pink]
-        case .tide: [Lab.teal, Color(red: 0.47, green: 1.0, blue: 0.67), Color(red: 0.36, green: 0.67, blue: 1.0), Color(red: 0.55, green: 0.43, blue: 1.0)]
+        case .dusk: [Brand.telemetry, Color(red: 0.36, green: 0.55, blue: 1.0), Brand.trajectory, Lab.pink]
+        case .tide: [Brand.telemetry, Color(red: 0.47, green: 1.0, blue: 0.67), Color(red: 0.36, green: 0.67, blue: 1.0), Brand.trajectory]
+        case .ember: [Brand.ignition, Lab.pink, Brand.trajectory, Brand.telemetry]
         }
     }
-    var seed: UInt64 { self == .dusk ? 5 : 11 }
+    var seed: UInt64 { switch self { case .dusk: 5; case .tide: 11; case .ember: 17 } }
 }
 
 /// Falling aurora bars, a light shaft, nebula glow, stars and sparkles, drawn procedurally and seeded so
@@ -102,7 +110,7 @@ public struct AuroraLayer: View {
             let sw = w * 0.16, sx = w * (0.4 + rng.next() * 0.2)
             ctx.fill(Path(CGRect(x: sx, y: 0, width: sw, height: h)),
                      with: .linearGradient(Gradient(stops: [.init(color: Color(red: 0.35, green: 0.43, blue: 1).opacity(0), location: 0), .init(color: Color(red: 0.35, green: 0.43, blue: 1).opacity(0.2), location: 0.35),
-                                                            .init(color: Color(red: 0.6, green: 0.47, blue: 1).opacity(0.14), location: 0.8), .init(color: Lab.ember.opacity(0.22), location: 1)]),
+                                                            .init(color: Color(red: 0.6, green: 0.47, blue: 1).opacity(0.14), location: 0.8), .init(color: Brand.ignition.opacity(0.22), location: 1)]),
                                            startPoint: CGPoint(x: sx, y: 0), endPoint: CGPoint(x: sx, y: h)))
             var rule = Path(); var x = sx
             while x < sx + sw { rule.addRect(CGRect(x: x, y: 0, width: 1, height: h)); x += 9 }
@@ -158,20 +166,21 @@ struct GrainLayer: View {
 }
 
 public extension View {
-    /// A self-contained glass container: navy gradient, warm floor glow, aurora, grain, a hairline edge and a gold inner frame.
-    func labPanel(corner: CGFloat = 26, variant: AuroraVariant = .dusk, aurora: Double = 0.5) -> some View {
+    /// A Brand card with extra depth: hull-to-space base, a warm ignition glow at the floor, a tinted glow at the top,
+    /// aurora streaks, grain, and a tinted hairline plus inner frame. Self-contained, so it reads over passthrough.
+    func labPanel(corner: CGFloat = 32, tint: Color = Brand.telemetry, variant: AuroraVariant = .dusk, aurora: Double = 0.4) -> some View {
         background {
             ZStack {
-                LinearGradient(colors: [Lab.navyHigh, Color(red: 0.04, green: 0.05, blue: 0.23), Lab.navy], startPoint: .top, endPoint: .bottom)
-                RadialGradient(colors: [Lab.ember.opacity(0.40), .clear], center: .bottom, startRadius: 0, endRadius: 360)
-                RadialGradient(colors: [Color(red: 0.33, green: 0.38, blue: 1).opacity(0.45), .clear], center: .top, startRadius: 0, endRadius: 320)
+                LinearGradient(colors: [Brand.hull, Color(red: 0.06, green: 0.08, blue: 0.14), Brand.space], startPoint: .top, endPoint: .bottom)
+                RadialGradient(colors: [Brand.ignition.opacity(0.26), .clear], center: .bottom, startRadius: 0, endRadius: 340)
+                RadialGradient(colors: [tint.opacity(0.20), .clear], center: .top, startRadius: 0, endRadius: 320)
                 AuroraLayer(variant: variant, strength: aurora)
                 GrainLayer()
             }
             .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
         }
-        .overlay { RoundedRectangle(cornerRadius: corner, style: .continuous).strokeBorder(Lab.edge.opacity(0.30), lineWidth: 1) }
-        .overlay { RoundedRectangle(cornerRadius: max(corner - 8, 4), style: .continuous).inset(by: 9).stroke(Lab.gold.opacity(0.17), lineWidth: 1).allowsHitTesting(false) }
-        .shadow(color: Color(red: 0.38, green: 0.4, blue: 1).opacity(0.22), radius: 28)
+        .overlay { RoundedRectangle(cornerRadius: corner, style: .continuous).strokeBorder(tint.opacity(0.38), lineWidth: 1) }
+        .overlay { RoundedRectangle(cornerRadius: max(corner - 8, 4), style: .continuous).inset(by: 9).stroke(tint.opacity(0.12), lineWidth: 1).allowsHitTesting(false) }
+        .shadow(color: tint.opacity(0.16), radius: 26)
     }
 }

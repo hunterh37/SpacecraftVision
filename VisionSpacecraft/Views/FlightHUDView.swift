@@ -1,4 +1,5 @@
 import SwiftUI
+import LabUI
 import SpacecraftCore
 import FlightSim
 import FlightRunner

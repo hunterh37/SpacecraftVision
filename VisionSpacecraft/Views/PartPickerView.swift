@@ -1,4 +1,5 @@
 import SwiftUI
+import LabUI
 import SpacecraftCore
 
 /// Part palette (specs/02): mission-allowed parts, the current stack top to bottom with radial parts,

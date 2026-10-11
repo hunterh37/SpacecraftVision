@@ -1,4 +1,5 @@
 import SwiftUI
+import LabUI
 import SpacecraftCore
 
 /// Live stat board beside the craft (specs/02 readouts, copy from specs/16 `board.*`).

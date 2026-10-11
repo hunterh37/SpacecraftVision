@@ -1,4 +1,5 @@
 import SwiftUI
+import LabUI
 import SpacecraftCore
 import Curriculum
 
@@ -97,8 +98,7 @@ private struct ModeCard: View {
         }
         .padding(28)
         .frame(width: 250, height: 320, alignment: .leading)
-        .background(Brand.hull.opacity(0.85), in: RoundedRectangle(cornerRadius: 32, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 32, style: .continuous).strokeBorder(mode.tint.opacity(0.35), lineWidth: 1))
+        .labPanel(corner: 32, tint: mode.tint, variant: mode == .missions ? .ember : mode == .workshop ? .dusk : .tide, aurora: 0.22)
         .contentShape(.hoverEffect, RoundedRectangle(cornerRadius: 32, style: .continuous))
     }
 }
