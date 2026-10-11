@@ -5,6 +5,8 @@ import FlightCode
 import FlightRunner
 import Curriculum
 import LabUI
+import TaskGuideCore
+import TaskGuideUI
 
 enum SpaceID: String { case workshop, range, space }
 enum WindowID { static let main = "main", parts = "parts", code = "code", analysis = "analysis" }
@@ -50,9 +52,21 @@ final class AppModel {
     // Flight
     let flight = FlightController()
     let walkthrough = WalkthroughModel()
+    /// Shared Workshop Guided Learning controller. Optional; free-build unchanged.
+    let taskGuide = TaskGuideController()
+    var taskGuideVisible = false
     let assembly = AssemblyModel()
     /// Set when the Analysis window first appears (walkthrough step 5).
     var analysisOpened = false
+
+    var isGuidedWorkshopActive: Bool {
+        taskGuideVisible && taskGuide.state.sessionPhase != .exited
+    }
+
+    var taskGuideTargetID: GuidanceTargetID? {
+        guard isGuidedWorkshopActive else { return nil }
+        return taskGuide.displayedTargetID
+    }
 
     // Walkthrough signals (Walkthrough/WalkthroughModel.swift predicates and demos)
     var homePath = NavigationPath()
@@ -87,7 +101,37 @@ final class AppModel {
     init() {
         craft = .rHop()
         craft.payloadMass = mission.payloadMass
+        syncTaskGuideSnapshot()
         schedulePreview()
+    }
+
+    // MARK: Workshop Guided Learning
+
+    func syncTaskGuideSnapshot() {
+        taskGuide.updateSnapshot(TaskGuideBridge.snapshot(from: self))
+    }
+
+    func beginGuidedWorkshop() {
+        walkthrough.suspendForTaskGuide()
+        taskGuideVisible = true
+        if taskGuide.state.sessionPhase == .exited {
+            taskGuide.startGuide()
+        }
+        syncTaskGuideSnapshot()
+    }
+
+    /// Ends visible guidance. Pass `resumeWorkshopTour: false` when leaving Workshop for Range/Space/close
+    /// so a Workshop tour is not restored before/during an unrelated scene.
+    func endGuidedWorkshop(resumeWorkshopTour: Bool = false) {
+        taskGuide.exitGuide()
+        taskGuideVisible = false
+        walkthrough.resumeAfterTaskGuide(allowWorkshopRestore: resumeWorkshopTour)
+    }
+
+    /// Called from SpaceSwitcher when leaving the Workshop immersive space.
+    func leaveWorkshopImmersive(for destination: SpaceID?) {
+        guard taskGuideVisible || walkthrough.suspendedForTaskGuide else { return }
+        endGuidedWorkshop(resumeWorkshopTour: false)
     }
 
     var source: String {
@@ -250,6 +294,7 @@ final class AppModel {
 
     func schedulePreview() {
         if flight.phase == .idle { flight.clearError() }
+        syncTaskGuideSnapshot()
         previewTask?.cancel()
         let src = source, craft = craft, mission = mission
         previewTask = Task {

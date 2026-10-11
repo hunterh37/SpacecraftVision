@@ -1,17 +1,18 @@
 import Foundation
 
-/// Stable semantic identifiers for guidance targets.
-/// Future RealityKit integration should reuse these identifiers rather than screen coordinates.
+/// Stable semantic identifiers for Workshop guidance targets.
 public enum GuidanceTargetID: String, Sendable, Codable, Hashable, CaseIterable {
     case missionBrief
-    case partsPalette
+    case partsStack
+    case tabletopToggle
     case craftAssembly
     case statBoard
 
     public var displayLabel: String {
         switch self {
         case .missionBrief: return "Mission Brief"
-        case .partsPalette: return "Parts Palette"
+        case .partsStack: return "Parts Stack"
+        case .tabletopToggle: return "Tabletop Scale"
         case .craftAssembly: return "Craft Assembly"
         case .statBoard: return "Stat Board"
         }

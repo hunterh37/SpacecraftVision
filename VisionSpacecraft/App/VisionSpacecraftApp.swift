@@ -74,6 +74,11 @@ struct SpaceSwitcher {
 
     func show(_ space: SpaceID) async {
         if model.openSpace == space { return }
+        let previous = model.openSpace
+        // Clear Workshop guidance before opening an unrelated scene (avoid stale tour restore while openSpace is still .workshop).
+        if previous == .workshop, space != .workshop {
+            model.leaveWorkshopImmersive(for: space)
+        }
         if model.openSpace != nil { await dismiss(); model.openSpace = nil }
         switch await open(id: space.rawValue) {
         case .opened: model.openSpace = space
@@ -82,6 +87,9 @@ struct SpaceSwitcher {
     }
 
     func close() async {
+        if model.openSpace == .workshop {
+            model.leaveWorkshopImmersive(for: nil)
+        }
         if model.openSpace != nil { await dismiss(); model.openSpace = nil }
     }
 }
