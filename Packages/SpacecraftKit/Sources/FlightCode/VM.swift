@@ -5,6 +5,13 @@ public protocol VMHost: AnyObject {
     func craftCall(_ name: String, _ args: [Value]) throws -> Value
 }
 
+/// One stop of the execution trace: a source line is about to run, with the variables visible right now.
+public struct TraceStop {
+    public let function: String
+    public let line: Int
+    public let variables: [(name: String, value: Value)]
+}
+
 /// Stack bytecode interpreter with an instruction budget per call, recursion depth 64 and a heap cap.
 public final class VM {
     public static let tickBudget = 100_000
@@ -20,6 +27,9 @@ public final class VM {
     var frames: [Frame] = []
     public private(set) var currentLine = 0
     public private(set) var instructionsUsed = 0
+    /// Called each time execution reaches a new source line. Nil (the default) costs one optional check per instruction.
+    public var traceHook: ((TraceStop) -> Void)?
+    private var traceFrames = -1, traceLine = -1, tracePC = -1
     var budget = 0
     var heapUsed = 0
 
@@ -61,6 +71,26 @@ public final class VM {
         return try loop()
     }
 
+    /// Fire the trace hook on entering a new line, a new frame, or after a backward jump (a loop turning over).
+    private func traceStep(_ fi: Int, _ code: Code, _ pc: Int) {
+        let line = code.lines[pc]
+        guard line > 0 else { return }
+        defer { traceFrames = frames.count; traceLine = line; tracePC = pc }
+        guard frames.count != traceFrames || line != traceLine || pc <= tracePC else { return }
+        var vars: [(name: String, value: Value)] = []
+        for (i, n) in code.localNames.enumerated() where i < frames[fi].locals.count {
+            if let v = frames[fi].locals[i] { vars.append((n, v)) }
+        }
+        for (i, n) in program.globals.enumerated() where i < globals.count {
+            guard let v = globals[i] else { continue }
+            switch v {
+            case .function, .builtin, .module, .iter: continue
+            default: vars.append((n, v))
+            }
+        }
+        traceHook?(TraceStop(function: code.name, line: line, variables: vars))
+    }
+
     func fault(_ k: VMFault.Kind, _ m: String) -> VMFault { VMFault(k, m, line: currentLine) }
 
     @inline(__always) func pop() -> Value { stack.removeLast() }
@@ -72,6 +102,7 @@ public final class VM {
             let pc = frames[fi].pc
             let op = code.ops[pc]
             currentLine = code.lines[pc]
+            if traceHook != nil { traceStep(fi, code, pc) }
             frames[fi].pc = pc + 1
             instructionsUsed += 1
             if instructionsUsed > budget { throw fault(.budget, "Tick used more than \(budget.formatted()) instructions") }

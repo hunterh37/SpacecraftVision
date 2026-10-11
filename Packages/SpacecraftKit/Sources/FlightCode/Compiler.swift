@@ -24,6 +24,7 @@ final class Code {
     let name: String
     let params: Int
     var nlocals = 0
+    var localNames: [String] = []
     var ops: [Op] = []
     var lines: [Int] = []
     init(name: String, params: Int) { self.name = name; self.params = params }
@@ -38,6 +39,8 @@ public final class Program {
     var globals: [String] = []
     var globalIndex: [String: Int] = [:]
     public internal(set) var functionNames: [String] = []
+    /// Total bytecode operations in the module and every function, for the compile summary.
+    public var opCount: Int { module.ops.count + functions.reduce(0) { $0 + $1.ops.count } }
 
     func global(_ n: String) -> Int {
         if let i = globalIndex[n] { return i }
@@ -187,13 +190,14 @@ struct Gen {
             for p in params { map[p] = map.count }
             for n in Gen.assignedNames(body) where map[n] == nil { map[n] = map.count }
             fcode.nlocals = map.count
+            fcode.localNames = map.sorted { $0.value < $1.value }.map(\.key)
             prog.functions.append(fcode)
             let fi = prog.functions.count - 1
             prog.functionNames.append(name)
             var g = Gen(prog: prog, code: fcode, locals: map)
             g.line = line
             try g.block(body)
-            g.emitConst(.none); g.emit(.ret)
+            g.emitConst(.none, line: 0); g.emit(.ret, line: 0)      // implicit return: not a source line, never traced
             emit(.makeFunction(fi))
             store(name)
         case let .ret(e):
