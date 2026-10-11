@@ -1,4 +1,5 @@
 import SwiftUI
+import LabUI
 
 enum SettingsRoute: Hashable { case main }
 
@@ -21,7 +22,7 @@ struct SettingsView: View {
                     Text("Shows a step-by-step tour the first time each mode and the launch range open. Each step has Show me, which performs the action, and Skip tour.")
                 }
                 Section("Replay a tour") {
-                    ForEach(TourID.allCases) { t in
+                    ForEach([TourID.range]) { t in
                         HStack {
                             Text(t.title)
                             Spacer()
@@ -48,6 +49,9 @@ struct SettingsView: View {
                     Text("Plays every tour on its own: a lesson from concept to graded flight, a mission into the range, then the hangar. Take over stops it at any step.")
                 }
             }
+            .scrollContentBackground(.hidden)
+            .labWindow()
+            .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
             .navigationTitle("Settings")
         }
     }

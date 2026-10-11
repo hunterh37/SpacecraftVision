@@ -9,38 +9,40 @@ struct PartPickerView: View {
 
     var body: some View {
         @Bindable var model = model
-        NavigationStack {
-            List {
-                Section {
-                    TipBanner(tip: .hangar)
-                    budgetMeter
-                }
-                Section("Rack: \(model.mission.id) parts") {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                LabHeader("Parts", caption: "Hangar · \(model.mission.id)", tint: Brand.trajectory)
+                TipBanner(tip: .hangar)
+                budgetMeter.padding(18).labCard(corner: 22, tint: Brand.telemetry, aurora: 0.12)
+                section("Rack: \(model.mission.id) parts") {
                     ForEach(model.mission.allowedParts, id: \.self) { id in
                         if let def = PartCatalog.part(id) {
                             let block = model.addBlock(id)
                             Button { model.addPart(id) } label: {
-                                HStack {
-                                    Image(systemName: icon(def.category)).frame(width: 28)
-                                    VStack(alignment: .leading) {
-                                        Text(def.displayName)
-                                        Text(block ?? detail(def)).font(.caption)
-                                            .foregroundStyle(block == nil ? Color.secondary : Brand.ignition)
+                                HStack(spacing: 12) {
+                                    Image(systemName: icon(def.category)).font(.system(size: 17, weight: .semibold)).foregroundStyle(Brand.trajectory).frame(width: 30)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(def.displayName).font(.system(size: 16, weight: .bold, design: .rounded)).foregroundStyle(Brand.ink)
+                                        Text(block ?? detail(def)).font(.system(size: 12, weight: .medium)).foregroundStyle(block == nil ? Brand.dim : Brand.ignition)
                                     }
                                     Spacer()
-                                    Text("\(def.cost) cr").font(.caption.monospacedDigit())
+                                    Text("\(def.cost) cr").font(Brand.label(12)).foregroundStyle(Brand.telemetry)
                                 }
+                                .padding(.horizontal, 14).padding(.vertical, 10)
+                                .labCard(corner: 16, tint: Brand.trajectory, aurora: 0.06)
+                                .opacity(block == nil ? 1 : 0.5)
                             }
-                            .disabled(block != nil)
+                            .buttonStyle(.plain).disabled(block != nil)
                         }
                     }
                 }
-                Section("Stack, top to bottom") {
-                    if model.craft.stack.isEmpty { Text("Empty. Add a probe core first.").foregroundStyle(.secondary) }
+                section("Stack, top to bottom") {
+                    if model.craft.stack.isEmpty { Text("Empty. Add a probe core first.").font(.system(size: 14, weight: .medium)).foregroundStyle(Brand.dim) }
                     ForEach(model.craft.stack) { p in
-                        VStack(alignment: .leading, spacing: 6) {
+                        VStack(alignment: .leading, spacing: 8) {
                             HStack {
-                                Text(p.definition.displayName).fontWeight(model.selectedStackPart == p.id ? .bold : .regular)
+                                Text(p.definition.displayName).font(.system(size: 16, weight: model.selectedStackPart == p.id ? .heavy : .semibold, design: .rounded))
+                                    .foregroundStyle(model.selectedStackPart == p.id ? Brand.telemetry : Brand.ink)
                                 Spacer()
                                 Button { model.moveStack(p.id, by: -1) } label: { Image(systemName: "arrow.up") }
                                 Button { model.moveStack(p.id, by: 1) } label: { Image(systemName: "arrow.down") }
@@ -49,35 +51,45 @@ struct PartPickerView: View {
                             .buttonStyle(.borderless)
                             if p.definition.propellantMass > 0 {
                                 HStack {
-                                    Text("Fuel \(Int((p.fuelLoad * 100).rounded()))%").font(.caption.monospacedDigit())
-                                    Slider(value: Binding(get: { p.fuelLoad }, set: { model.setFuel(p.id, ($0 * 20).rounded() / 20) }),
-                                           in: 0...1, step: 0.05)
-                                        .disabled(model.mission.fixedFuelLoad != nil)
+                                    Text("FUEL \(Int((p.fuelLoad * 100).rounded()))%").font(Brand.label(11)).foregroundStyle(Brand.dim)
+                                    Slider(value: Binding(get: { p.fuelLoad }, set: { model.setFuel(p.id, ($0 * 20).rounded() / 20) }), in: 0...1, step: 0.05)
+                                        .tint(Brand.telemetry).disabled(model.mission.fixedFuelLoad != nil)
                                 }
                                 if model.mission.fixedFuelLoad != nil {
-                                    Text("Fuel load fixed by the mission.").font(.caption2).foregroundStyle(.secondary)
+                                    Text("Fuel load fixed by the mission.").font(.system(size: 11, weight: .medium)).foregroundStyle(Brand.dim)
                                 }
                             }
                             ForEach(model.craft.radial.filter { $0.parentId == p.id }) { r in
                                 HStack {
-                                    Text("  + \(r.definition.displayName)\(r.count > 1 ? " x\(r.count)" : "")").font(.callout)
+                                    Text("+ \(r.definition.displayName)\(r.count > 1 ? " x\(r.count)" : "")").font(.system(size: 14, weight: .medium)).foregroundStyle(Brand.ink)
                                     Spacer()
-                                    Button(role: .destructive) { model.removeRadial(r.id) } label: { Image(systemName: "minus.circle") }
-                                        .buttonStyle(.borderless)
+                                    Button(role: .destructive) { model.removeRadial(r.id) } label: { Image(systemName: "minus.circle") }.buttonStyle(.borderless)
                                 }
                             }
                         }
+                        .padding(.horizontal, 14).padding(.vertical, 12)
+                        .labCard(corner: 16, tint: model.selectedStackPart == p.id ? Brand.telemetry : Brand.trajectory, aurora: 0.06)
                         .contentShape(Rectangle())
                         .onTapGesture { model.selectedStackPart = p.id }
                     }
                 }
-                Section {
-                    Toggle("Tabletop scale", isOn: $model.workshopTabletop)
-                    Button("Load reference craft") { model.loadReferenceCraft() }
-                    Button("Clear craft", role: .destructive) { model.clearCraft() }
+                section("Craft") {
+                    Toggle("Tabletop scale", isOn: $model.workshopTabletop).font(.system(size: 15, weight: .semibold)).tint(Brand.telemetry)
+                    HStack(spacing: 10) {
+                        Button("Load reference craft") { model.loadReferenceCraft() }.buttonStyle(LabSecondaryButtonStyle(tint: Brand.telemetry))
+                        Button("Clear craft", role: .destructive) { model.clearCraft() }.buttonStyle(LabSecondaryButtonStyle(tint: Lab.danger))
+                    }
                 }
             }
-            .navigationTitle("Parts")
+            .padding(24)
+        }
+        .labWindow(tint: Brand.trajectory, variant: .dusk)
+    }
+
+    private func section<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) { Rectangle().fill(Brand.trajectory).frame(width: 22, height: 3).clipShape(Capsule()); Text(title.uppercased()).font(Brand.label(11)).tracking(2.2).foregroundStyle(Brand.trajectory) }
+            content()
         }
     }
 

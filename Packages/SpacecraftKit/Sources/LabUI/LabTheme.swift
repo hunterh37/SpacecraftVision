@@ -165,22 +165,41 @@ struct GrainLayer: View {
     }
 }
 
-public extension View {
-    /// A Brand card with extra depth: hull-to-space base, a warm ignition glow at the floor, a tinted glow at the top,
-    /// aurora streaks, grain, and a tinted hairline plus inner frame. Self-contained, so it reads over passthrough.
-    func labPanel(corner: CGFloat = 32, tint: Color = Brand.telemetry, variant: AuroraVariant = .dusk, aurora: Double = 0.4) -> some View {
-        background {
-            ZStack {
-                LinearGradient(colors: [Brand.hull, Color(red: 0.06, green: 0.08, blue: 0.14), Brand.space], startPoint: .top, endPoint: .bottom)
-                RadialGradient(colors: [Brand.ignition.opacity(0.26), .clear], center: .bottom, startRadius: 0, endRadius: 340)
-                RadialGradient(colors: [tint.opacity(0.20), .clear], center: .top, startRadius: 0, endRadius: 320)
-                AuroraLayer(variant: variant, strength: aurora)
-                GrainLayer()
-            }
-            .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
+/// The shared surface: hull-to-space base, a warm ignition glow at the floor, a tinted glow at the top, aurora streaks and grain.
+/// Used as a panel background, as a whole window's container background, and (lighter) behind rows and tiles.
+public struct LabSurface: View {
+    public var tint: Color
+    public var variant: AuroraVariant
+    public var aurora: Double
+    public init(tint: Color = Brand.telemetry, variant: AuroraVariant = .dusk, aurora: Double = 0.4) { self.tint = tint; self.variant = variant; self.aurora = aurora }
+    public var body: some View {
+        ZStack {
+            LinearGradient(colors: [Brand.hull, Color(red: 0.06, green: 0.08, blue: 0.14), Brand.space], startPoint: .top, endPoint: .bottom)
+            RadialGradient(colors: [Brand.ignition.opacity(0.26), .clear], center: .bottom, startRadius: 0, endRadius: 340)
+            RadialGradient(colors: [tint.opacity(0.20), .clear], center: .top, startRadius: 0, endRadius: 320)
+            AuroraLayer(variant: variant, strength: aurora)
+            GrainLayer()
         }
+    }
+}
+
+public extension View {
+    /// A Brand card with extra depth, clipped, with a tinted hairline and an inner frame. Self-contained, so it reads over passthrough.
+    func labPanel(corner: CGFloat = 32, tint: Color = Brand.telemetry, variant: AuroraVariant = .dusk, aurora: Double = 0.4) -> some View {
+        background { LabSurface(tint: tint, variant: variant, aurora: aurora).clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous)) }
         .overlay { RoundedRectangle(cornerRadius: corner, style: .continuous).strokeBorder(tint.opacity(0.38), lineWidth: 1) }
         .overlay { RoundedRectangle(cornerRadius: max(corner - 8, 4), style: .continuous).inset(by: 9).stroke(tint.opacity(0.12), lineWidth: 1).allowsHitTesting(false) }
         .shadow(color: tint.opacity(0.16), radius: 26)
+    }
+
+    /// A lighter card for rows and tiles inside a window or panel: same surface, quieter aurora, tinted hairline.
+    func labCard(corner: CGFloat = 22, tint: Color = Brand.telemetry, variant: AuroraVariant = .dusk, aurora: Double = 0.16) -> some View {
+        background { LabSurface(tint: tint, variant: variant, aurora: aurora).opacity(0.92).clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous)) }
+            .overlay { RoundedRectangle(cornerRadius: corner, style: .continuous).strokeBorder(tint.opacity(0.30), lineWidth: 1) }
+    }
+
+    /// Makes the whole window wear the surface. Pair with `.windowStyle(.plain)` on the scene so the system glass is not drawn behind it.
+    func labWindow(tint: Color = Brand.telemetry, variant: AuroraVariant = .dusk, aurora: Double = 0.42) -> some View {
+        labPanel(corner: 44, tint: tint, variant: variant, aurora: aurora)
     }
 }

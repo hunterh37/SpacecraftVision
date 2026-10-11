@@ -1,5 +1,6 @@
 import SwiftUI
 import Charts
+import LabUI
 import FlightRunner
 import FlightSim
 
@@ -11,23 +12,30 @@ struct AnalysisView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 18) {
+                if !compact { LabHeader("Analysis", caption: "Last flight", tint: Brand.ignition) }
                 if let r = model.lastReport {
                     ResultCard(report: r)
                     FlightPlots(report: r, ghosts: Array(model.reports.dropLast().suffix(2)), compact: compact)
                     if !r.events.isEmpty && !compact {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Events").font(.headline)
-                            ForEach(r.events, id: \.self) { Text($0).font(.caption.monospaced()) }
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("EVENTS").font(Brand.label(11)).tracking(2.2).foregroundStyle(Brand.dim)
+                            ForEach(r.events, id: \.self) { Text($0).font(Brand.label(12)).foregroundStyle(Brand.ink) }
                         }
+                        .padding(20).frame(maxWidth: .infinity, alignment: .leading).labCard(corner: 22, tint: Brand.trajectory, aurora: 0.1)
                     }
                 } else {
-                    ContentUnavailableView("No flights yet", systemImage: "chart.xyaxis.line",
-                                           description: Text("Launch a flight in the range. Plots appear here when it ends."))
+                    VStack(spacing: 8) {
+                        Image(systemName: "chart.xyaxis.line").font(.system(size: 34)).foregroundStyle(Brand.ignition)
+                        Text("No flights yet").font(Brand.display(20)).foregroundStyle(Brand.ink)
+                        Text("Launch a flight in the range. Plots appear here when it ends.").font(.system(size: 14, weight: .medium)).foregroundStyle(Brand.dim)
+                    }
+                    .padding(32).frame(maxWidth: .infinity).labCard(corner: 26, tint: Brand.ignition, variant: .ember, aurora: 0.2)
                 }
             }
-            .padding(20)
+            .padding(compact ? 0 : 24)
         }
+        .labWindow(tint: Brand.ignition, variant: .ember)
         .onAppear { model.analysisOpened = true }
     }
 }
@@ -67,19 +75,23 @@ struct FlightPlots: View {
     }
 
     func chart(_ title: String, _ pts: [Pt]) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.subheadline.bold())
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title.uppercased()).font(Brand.label(11)).tracking(2).foregroundStyle(Brand.telemetry)
             Chart(pts) { p in
                 LineMark(x: .value("t (s)", p.t), y: .value(title, p.v))
                     .foregroundStyle(by: .value("Run", p.run))
-                    .lineStyle(StrokeStyle(lineWidth: p.run == "This run" ? 2 : 1))
+                    .lineStyle(StrokeStyle(lineWidth: p.run == "This run" ? 2.5 : 1.2, lineCap: .round, lineJoin: .round))
+                    .interpolationMethod(.monotone)
             }
-            .chartXAxisLabel("t (s)")
-            .chartForegroundStyleScale(["This run": Color.blue, "Run -1": Color.gray, "Run -2": Color.gray.opacity(0.5)])
-            .frame(height: compact ? 150 : 200)
-            .padding(10)
-            .background(.white.opacity(0.92), in: RoundedRectangle(cornerRadius: 8))
-            .environment(\.colorScheme, .light)
+            .chartXAxisLabel("t (s)", alignment: .trailing)
+            .chartXAxis { AxisMarks { _ in AxisGridLine().foregroundStyle(.white.opacity(0.08)); AxisTick().foregroundStyle(.white.opacity(0.25)); AxisValueLabel().foregroundStyle(Brand.dim) } }
+            .chartYAxis { AxisMarks { _ in AxisGridLine().foregroundStyle(.white.opacity(0.08)); AxisValueLabel().foregroundStyle(Brand.dim) } }
+            .chartForegroundStyleScale(["This run": Brand.telemetry, "Run -1": Brand.trajectory.opacity(0.7), "Run -2": Brand.ignition.opacity(0.55)])
+            .chartLegend(position: .bottom, alignment: .leading)
+            .frame(height: compact ? 140 : 190)
+            .padding(14)
+            .labPlate()
+            .environment(\.colorScheme, .dark)
         }
     }
 }

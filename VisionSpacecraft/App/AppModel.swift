@@ -74,7 +74,7 @@ final class AppModel {
     var reports: [FlightReport] = []
 
     // Lesson progress
-    var lessonStage: LessonStage = .concept
+    var lessonStage: LessonStage = .implement
     var answers: [Int: Int] = [:]
     var pseudocodePassed: Set<Int> = []
     var completed: [Int: Int] = [:]   // lesson id -> stars
@@ -131,7 +131,7 @@ final class AppModel {
 
     func select(lesson l: Lesson) {
         lesson = l
-        lessonStage = .concept
+        lessonStage = .implement
         mission = l.mission
     }
 

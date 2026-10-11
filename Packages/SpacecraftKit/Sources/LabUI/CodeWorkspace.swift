@@ -72,10 +72,13 @@ public struct CodeWorkspace: View {
     public var report: FlightReport?
     public var course: Course?
     public var live: FlightLive?
+    /// Draw the workspace's own panel. Turn off when it already sits on a window surface.
+    public var chrome = true
     @State private var width: CGFloat = 0
 
     public init(model: CodeWorkspaceModel, errorLine: Int? = nil, errorText: String? = nil, flightDuration: Double = 60,
-                report: FlightReport? = nil, course: Course? = nil, live: FlightLive? = nil) {
+                report: FlightReport? = nil, course: Course? = nil, live: FlightLive? = nil, chrome: Bool = true) {
+        self.chrome = chrome
         self.model = model; self.errorLine = errorLine; self.errorText = errorText; self.flightDuration = flightDuration
         self.report = report; self.course = course; self.live = live
     }
@@ -100,7 +103,7 @@ public struct CodeWorkspace: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .padding(18)
-        .labPanel(tint: errorText == nil ? Brand.telemetry : Lab.danger, variant: model.tab == .python ? .dusk : .tide)
+        .modifier(WorkspaceChrome(enabled: chrome, tint: errorText == nil ? Brand.telemetry : Lab.danger, variant: model.tab == .python ? .dusk : .tide))
         .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width = $0 }
         .onChange(of: model.tab) { _, t in if t == .trace { Task { await model.runTrace() } } }
     }
@@ -190,5 +193,14 @@ public struct CodeWorkspace: View {
                 Text(model.tracing ? "Compiling and tracing..." : "Open this tab to trace one guidance tick.").font(Lab.soft(13)).foregroundStyle(Lab.muted).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+    }
+}
+
+private struct WorkspaceChrome: ViewModifier {
+    var enabled: Bool
+    var tint: Color
+    var variant: AuroraVariant
+    func body(content: Content) -> some View {
+        if enabled { content.labPanel(tint: tint, variant: variant) } else { content.labCard(corner: 28, tint: tint, variant: variant, aurora: 0.2) }
     }
 }
