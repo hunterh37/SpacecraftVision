@@ -1,11 +1,15 @@
 import SwiftUI
 import LabUI
 import SpacecraftCore
+import TaskGuideCore
+import TaskGuideUI
 
 /// Part palette (specs/02): mission-allowed parts, the current stack top to bottom with radial parts,
 /// fuel load per tank, reorder and remove.
 struct PartPickerView: View {
     @Environment(AppModel.self) private var model
+    @State private var targetBounds: [GuidanceTargetID: CGRect] = [:]
+    private let guidanceSpace = "PartsGuidance"
 
     var body: some View {
         @Bindable var model = model
@@ -68,17 +72,45 @@ struct PartPickerView: View {
                             }
                         }
                         .contentShape(Rectangle())
-                        .onTapGesture { model.selectedStackPart = p.id }
+                        .onTapGesture {
+                            // Explicit selection event for W02 — fires even when already selected.
+                            model.selectedStackPart = p.id
+                            model.taskGuide.noteComponentSelection(partID: p.partId)
+                        }
                     }
                 }
+                .guidanceTarget(.partsStack, coordinateSpaceName: guidanceSpace)
+
                 Section {
-                    Toggle("Tabletop scale", isOn: $model.workshopTabletop)
+                    Toggle(isOn: Binding(
+                        get: { model.workshopTabletop },
+                        set: { newValue in
+                            model.workshopTabletop = newValue
+                            model.syncTaskGuideSnapshot()
+                            model.taskGuide.noteTabletopScaleChanged(newValue: newValue, userInitiated: true)
+                        }
+                    )) {
+                        Text("Tabletop scale")
+                    }
+                    .guidanceTarget(.tabletopToggle, coordinateSpaceName: guidanceSpace)
                     Button("Load reference craft") { model.loadReferenceCraft() }
                     Button("Clear craft", role: .destructive) { model.clearCraft() }
                 }
             }
             .navigationTitle("Parts")
+            .coordinateSpace(name: guidanceSpace)
+            .onPreferenceChange(GuidanceTargetBoundsKey.self) { targetBounds = $0 }
+            .overlay {
+                let active: GuidanceTargetID? = {
+                    switch model.taskGuideTargetID {
+                    case .partsStack, .tabletopToggle: return model.taskGuideTargetID
+                    default: return nil
+                    }
+                }()
+                GuidanceHighlightOverlay(activeID: active, bounds: targetBounds, showsArrow: false)
+            }
         }
+        .onAppear { model.syncTaskGuideSnapshot() }
     }
 
     var budgetMeter: some View {

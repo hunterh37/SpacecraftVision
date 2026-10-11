@@ -3,12 +3,14 @@ import RealityKit
 import RealKit
 import RealLibrary
 import SpacecraftCore
+import TaskGuideCore
 
 /// Life-size hangar (specs/02): 30 x 20 x 12 m shell, open door to the sky, RealityHD clutter props,
 /// the craft at 1:1 on the floor 3 m ahead, and the live stat board beside it.
 struct WorkshopImmersiveView: View {
     @Environment(AppModel.self) private var model
     @State private var craftHolder = Entity()
+    @State private var guidanceRing = Entity()
     @State private var env: RealEnvironment?
     @State private var skyHolder = Entity()
     @State private var sun = Entity()
@@ -28,10 +30,18 @@ struct WorkshopImmersiveView: View {
             root.addChild(Self.hangarShell())
             craftHolder.position = [0, 0, -3]
             root.addChild(craftHolder)
+            guidanceRing.name = "taskGuideCraftRing"
+            guidanceRing.isEnabled = false
+            root.addChild(guidanceRing)
             if let board = attachments.entity(for: "board") {
                 board.position = [1.7, 1.45, -2.6]
                 board.orientation = simd_quatf(angle: -0.35, axis: [0, 1, 0])
                 root.addChild(board)
+            }
+            if let panel = attachments.entity(for: "taskGuide") {
+                panel.position = [-1.85, 1.35, -2.4]
+                panel.orientation = simd_quatf(angle: 0.35, axis: [0, 1, 0])
+                root.addChild(panel)
             }
             // RealityHD clutter (existing catalog assets).
             let props: [(String, SIMD3<Float>, Float, UInt64)] = [
@@ -48,10 +58,18 @@ struct WorkshopImmersiveView: View {
                 }
             }
             env?.illuminate(root)
-        } update: { _, _ in
+        } update: { _, attachments in
+            if let panel = attachments.entity(for: "taskGuide") {
+                panel.isEnabled = model.taskGuideVisible && model.taskGuide.state.sessionPhase != .exited
+            }
+            updateCraftGuidanceRing()
         } attachments: {
             Attachment(id: "board") {
                 StatBoardView()
+                    .environment(model)
+            }
+            Attachment(id: "taskGuide") {
+                WorkshopTaskGuidePanel()
                     .environment(model)
             }
         }
@@ -68,8 +86,19 @@ struct WorkshopImmersiveView: View {
                 craftHolder.scale = .one
             }
             env?.illuminate(craftHolder)
+            updateCraftGuidanceRing()
         }
         .task(id: model.skyStyle) { updateSky() }
+        .onChange(of: model.taskGuideTargetID) { _, _ in updateCraftGuidanceRing() }
+        .onChange(of: model.taskGuideVisible) { _, visible in
+            if !visible { clearCraftGuidanceRing() }
+            else { updateCraftGuidanceRing() }
+        }
+        .onAppear { model.syncTaskGuideSnapshot() }
+        .onDisappear {
+            // Leaving Workshop clears task-specific scene visuals.
+            clearCraftGuidanceRing()
+        }
     }
 
     struct CraftKey: Hashable { var craft: CraftDesign; var sel: UUID?; var table: Bool }
@@ -78,6 +107,39 @@ struct WorkshopImmersiveView: View {
         skyHolder.children.removeAll()
         if let sky = SkyBackdrop.make(model.skyStyle, timeOfDay: .afternoon, radius: 300) { skyHolder.addChild(sky) }
         SceneLighting.update(sun: sun, style: model.skyStyle, timeOfDay: .afternoon)
+    }
+
+    private func clearCraftGuidanceRing() {
+        guidanceRing.isEnabled = false
+        guidanceRing.children.removeAll()
+    }
+
+    private func updateCraftGuidanceRing() {
+        let active = model.taskGuideVisible
+            && (model.taskGuideTargetID == .craftAssembly || model.taskGuideTargetID == .partsStack)
+        guidanceRing.position = craftHolder.position
+        guidanceRing.scale = craftHolder.scale
+        // Soft craft marker while identifying components; primary highlight remains in Parts.
+        guard active else {
+            clearCraftGuidanceRing()
+            return
+        }
+        guidanceRing.isEnabled = true
+        guidanceRing.children.removeAll()
+        let height = Float(max(model.craft.height, 0.5))
+        let radius = Float(max(model.craft.stack.map { $0.definition.diameter }.max() ?? 0.6, 0.4) / 2 + 0.18)
+        let ring = ModelEntity(
+            mesh: .generateCylinder(height: 0.03, radius: radius),
+            materials: [PartMeshFactory.unlit(0x58C8FF, alpha: 0.45)]
+        )
+        ring.position = [0, 0.02, 0]
+        let column = ModelEntity(
+            mesh: .generateCylinder(height: height + 0.4, radius: 0.04),
+            materials: [PartMeshFactory.unlit(0x58C8FF, alpha: 0.28)]
+        )
+        column.position = [0, (height + 0.4) / 2, 0]
+        guidanceRing.addChild(ring)
+        guidanceRing.addChild(column)
     }
 
     static func hangarShell() -> Entity {

@@ -1,16 +1,23 @@
 import SwiftUI
 import LabUI
 import SpacecraftCore
+import TaskGuideCore
+import TaskGuideUI
 
 /// Live stat board beside the craft (specs/02 readouts, copy from specs/16 `board.*`).
 struct StatBoardView: View {
     @Environment(AppModel.self) private var model
+    @State private var targetBounds: [GuidanceTargetID: CGRect] = [:]
+    private let guidanceSpace = "StatBoardGuidance"
 
     var body: some View {
         let s = model.craft.stats()
         let m = model.mission
         VStack(alignment: .leading, spacing: 8) {
-            Text("\(m.id) \(m.title)").font(.title2.bold())
+            Text("\(m.id) \(m.title)")
+                .font(.title2.bold())
+                .guidanceTarget(.missionBrief, coordinateSpaceName: guidanceSpace)
+
             Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 6) {
                 row("Wet mass", "\(Int(s.wetMass.rounded())) / \(Int(m.massCap)) kg", warn: s.wetMass > m.massCap)
                 row("Dry mass", "\(Int(s.dryMass.rounded())) kg")
@@ -25,28 +32,43 @@ struct StatBoardView: View {
             }
             .font(.body.monospacedDigit())
             Divider()
-            if model.blockers.isEmpty {
-                if s.twrSL < 1 {
-                    Label("Thrust to weight below 1.0. The craft will not lift off.", systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.orange)
-                } else {
-                    Label("Ready to launch", systemImage: "checkmark.seal").foregroundStyle(.green)
-                }
-            } else {
-                ForEach(model.blockers, id: \.key) { b in
-                    VStack(alignment: .leading) {
-                        Text("Cannot launch. \(b.title)").bold()
-                        Text(b.body).font(.caption)
+            Group {
+                if model.blockers.isEmpty {
+                    if s.twrSL < 1 {
+                        Label("Thrust to weight below 1.0. The craft will not lift off.", systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(.orange)
+                    } else {
+                        Label("Ready to launch", systemImage: "checkmark.seal").foregroundStyle(.green)
                     }
-                    .foregroundStyle(.red)
+                } else {
+                    ForEach(model.blockers, id: \.key) { b in
+                        VStack(alignment: .leading) {
+                            Text("Cannot launch. \(b.title)").bold()
+                            Text(b.body).font(.caption)
+                        }
+                        .foregroundStyle(.red)
+                    }
+                    Button("Load reference craft", systemImage: "arrow.uturn.backward") { model.loadReferenceCraft() }
+                        .buttonStyle(BrandButtonStyle())
                 }
-                Button("Load reference craft", systemImage: "arrow.uturn.backward") { model.loadReferenceCraft() }
-                    .buttonStyle(BrandButtonStyle())
             }
+            .guidanceTarget(.statBoard, coordinateSpaceName: guidanceSpace)
         }
         .padding(24)
         .frame(width: 460)
         .glassBackgroundEffect()
+        .coordinateSpace(name: guidanceSpace)
+        .onPreferenceChange(GuidanceTargetBoundsKey.self) { targetBounds = $0 }
+        .overlay {
+            let active: GuidanceTargetID? = {
+                switch model.taskGuideTargetID {
+                case .missionBrief, .statBoard: return model.taskGuideTargetID
+                default: return nil
+                }
+            }()
+            GuidanceHighlightOverlay(activeID: active, bounds: targetBounds, showsArrow: false)
+        }
+        .onAppear { model.syncTaskGuideSnapshot() }
     }
 
     @ViewBuilder

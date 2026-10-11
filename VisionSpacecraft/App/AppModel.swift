@@ -5,6 +5,8 @@ import FlightCode
 import FlightRunner
 import Curriculum
 import LabUI
+import TaskGuideCore
+import TaskGuideUI
 
 enum SpaceID: String { case workshop, range, space }
 enum WindowID { static let main = "main", parts = "parts", code = "code", analysis = "analysis" }
@@ -50,8 +52,21 @@ final class AppModel {
     // Flight
     let flight = FlightController()
     let walkthrough = WalkthroughModel()
+    /// Shared Workshop Guided Learning controller (TaskGuideKit). Optional; free-build unchanged.
+    let taskGuide = TaskGuideController()
+    /// When true, the Workshop task panel attachment is shown.
+    var taskGuideVisible = false
     /// Set when the Analysis window first appears (walkthrough step 5).
     var analysisOpened = false
+
+    var isGuidedWorkshopActive: Bool {
+        taskGuideVisible && taskGuide.state.sessionPhase != .exited
+    }
+
+    var taskGuideTargetID: GuidanceTargetID? {
+        guard isGuidedWorkshopActive else { return nil }
+        return taskGuide.displayedTargetID
+    }
 
     // Walkthrough signals (Walkthrough/WalkthroughModel.swift predicates and demos)
     var homePath = NavigationPath()
@@ -82,7 +97,34 @@ final class AppModel {
     init() {
         craft = .rHop()
         craft.payloadMass = mission.payloadMass
+        syncTaskGuideSnapshot()
         schedulePreview()
+    }
+
+    // MARK: Workshop Guided Learning
+
+    func syncTaskGuideSnapshot() {
+        taskGuide.updateSnapshot(TaskGuideBridge.snapshot(from: self))
+    }
+
+    /// Starts optional Guided Workshop: suspends competing Workshop tour UI, shows the panel, syncs live craft.
+    func beginGuidedWorkshop() {
+        walkthrough.suspendForTaskGuide()
+        taskGuideVisible = true
+        // Re-entry: do not exit or reset; restore coherent unfinished or completion summary.
+        if taskGuide.state.sessionPhase == .exited {
+            taskGuide.startGuide()
+        }
+        syncTaskGuideSnapshot()
+    }
+
+    /// Hides guidance and restores walkthrough availability without marking tours done.
+    func endGuidedWorkshop() {
+        taskGuide.exitGuide()
+        taskGuideVisible = false
+        // Do not resume a Workshop tour card while the user is on the range or in space.
+        let allowWorkshop = openSpace == nil || openSpace == .workshop
+        walkthrough.resumeAfterTaskGuide(allowWorkshopRestore: allowWorkshop)
     }
 
     var source: String {
@@ -221,6 +263,7 @@ final class AppModel {
 
     func schedulePreview() {
         if flight.phase == .idle { flight.clearError() }
+        syncTaskGuideSnapshot()
         previewTask?.cancel()
         let src = source, craft = craft, mission = mission
         previewTask = Task {

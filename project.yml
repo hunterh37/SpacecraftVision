@@ -9,6 +9,8 @@ packages:
     path: ../RealityHD
   SpacecraftKit:
     path: Packages/SpacecraftKit
+  TaskGuideKit:
+    path: Packages/TaskGuideKit
 targets:
   VisionSpacecraft:
     type: application
@@ -30,6 +32,10 @@ targets:
         product: Curriculum
       - package: SpacecraftKit
         product: LabUI
+      - package: TaskGuideKit
+        product: TaskGuideCore
+      - package: TaskGuideKit
+        product: TaskGuideUI
     settings:
       base:
         SWIFT_VERSION: "6.0"
