@@ -116,6 +116,7 @@ final class RangeScene {
     let ribbonHolder = Entity()
     let asteroidHolder = Entity()
     var craftModel: Entity?
+    var poser: CraftPoser?
     var plume: ModelEntity?
     var drogue: ModelEntity?
     var mainChute: ModelEntity?
@@ -268,6 +269,7 @@ final class RangeScene {
         e.position = [0, -com, 0]
         craftHolder.addChild(e)
         craftModel = e
+        poser = CraftPoser(craft: e)
         let plume = ModelEntity(mesh: PartMeshFactory.cylinder("plume", r: 0.5, h: 6, top: 0.05), materials: [PartMeshFactory.unlit(0xFFB65C, alpha: 0.85)])
         plume.orientation = simd_quatf(angle: .pi, axis: [1, 0, 0])
         plume.position = [0, -com, 0]
@@ -313,6 +315,7 @@ final class RangeScene {
         craftHolder.position = [0, com, 0]
         craftHolder.orientation = simd_quatf(angle: 0, axis: [0, 1, 0])
         plume?.isEnabled = false; drogue?.isEnabled = false; mainChute?.isEnabled = false
+        poser?.reset()
     }
 
     func updateCraft(_ f: FlightController, view: FlightView, course: Course, dt: Double = 1.0 / 90) {
@@ -328,8 +331,11 @@ final class RangeScene {
         }
         // Canopies hang above the craft, opposite to gravity.
         let up = craftHolder.orientation.inverse.act([0, 1, 0])
-        drogue?.isEnabled = f.chuteStage == 1
-        mainChute?.isEnabled = f.chuteStage == 2
+        let rigged = poser?.hasRiggedChute ?? false
+        drogue?.isEnabled = !rigged && f.chuteStage == 1
+        mainChute?.isEnabled = !rigged && f.chuteStage == 2
+        poser?.update(.init(flying: f.phase == .flying, altitude: f.altitude, verticalSpeed: f.verticalSpeed, speed: f.speed,
+                            throttle: f.throttle, fuel: f.fuel, chuteStage: f.chuteStage, rates: f.rates, dt: dt))
         for c in [drogue, mainChute].compactMap({ $0 }) {
             c.position = up * (f.chuteStage == 2 ? 14 : 8)
             c.orientation = simd_quatf(from: [0, 1, 0], to: up)

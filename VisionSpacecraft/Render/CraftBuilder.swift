@@ -12,6 +12,7 @@ enum CraftBuilder {
         var spanOf: [UUID: (bottom: Double, top: Double, dia: Double)] = [:]
         for (i, p) in craft.stack.enumerated() {
             let e = await PartMeshFactory.entity(p.partId)
+            e.components.set(PartTagComponent(partId: p.partId))
             e.position = [0, Float(spans[i].bottom), 0]
             e.name = p.id.uuidString
             if p.id == highlight {
@@ -30,6 +31,7 @@ enum CraftBuilder {
             let base = slot[pid, default: 0]
             for k in 0..<count {
                 let e = await PartMeshFactory.entity(r.partId)
+                e.components.set(PartTagComponent(partId: r.partId))
                 let ang: Float
                 if count > 1 { ang = Float(k) / Float(count) * 2 * .pi + .pi / 4 } else { ang = Float(base) * 1.1 + 0.4 }
                 let rr = Float(span.dia / 2)

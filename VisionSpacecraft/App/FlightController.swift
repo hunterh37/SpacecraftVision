@@ -32,6 +32,9 @@ final class FlightController {
     private(set) var pitch = Double.pi / 2
     private(set) var yaw = 0.0
     private(set) var chuteStage = 0
+    /// Commanded body rates (pitch, yaw, roll), rad/s; drives gimbal and control-surface poses.
+    private(set) var rates = Vec3.zero
+    private(set) var verticalSpeed = 0.0
     private(set) var lastFault: String?
     /// Increments each launch so the scene can reset entities.
     private(set) var launchID = 0
@@ -112,6 +115,8 @@ final class FlightController {
         pitch = sim.pitch
         yaw = sim.yaw
         chuteStage = sim.chuteStage
+        rates = sim.rateCommand
+        verticalSpeed = sim.velocity.z
         lastFault = sim.faultMessages.last.map { "Line \($0.line): \($0.message)" }
     }
 
