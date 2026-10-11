@@ -6,6 +6,7 @@ import RealLibrary
 import SpacecraftCore
 import FlightSim
 import FlightRunner
+import Curriculum
 
 /// Course frame (x east, y north, z up) to RealityKit (x right, y up, -z ahead).
 @inline(__always) func rk(_ v: Vec3) -> SIMD3<Float> { SIMD3(Float(v.x), Float(v.z), Float(-v.y)) }
@@ -45,6 +46,14 @@ struct RangeImmersiveView: View {
                     hud.addChild(btn)
                 }
             }
+            if let deck = attachments.entity(for: "lesson") {
+                // Left of the viewer, angled in, beside the pad sightline.
+                deck.position = [-0.95, 1.2, -1.05]
+                deck.orientation = simd_quatf(angle: 0.55, axis: [0, 1, 0])
+                deck.isEnabled = model.learnActive
+                content.add(deck)
+                scene.deck = deck
+            }
             content.add(scene.indicators.world)
             await scene.buildStatic(course: model.mission.course)
             await scene.rebuildCraft(model.craft)
@@ -63,6 +72,10 @@ struct RangeImmersiveView: View {
             }
             Attachment(id: "spaceBtn") {
                 SpaceViewButton()
+                    .environment(model)
+            }
+            Attachment(id: "lesson") {
+                LessonDeckView()
                     .environment(model)
             }
             Attachment(id: "callout") {
@@ -84,7 +97,8 @@ struct RangeImmersiveView: View {
         .onChange(of: model.flight.launchID) { scene.resetCraftPose(); scene.resetGates() }
         .onChange(of: model.flight.gates) { _, n in scene.markGatePassed(n) }
         .onChange(of: model.walkthrough.successCount) { scene.playSuccess() }
-        .onAppear { model.walkthrough.startIfNeeded() }
+        .onAppear { if !model.learnActive { model.walkthrough.startIfNeeded() } }
+        .onChange(of: model.learnActive) { _, on in scene.deck?.isEnabled = on }
         .modifier(FollowToSpace())
     }
 
@@ -116,12 +130,25 @@ final class RangeScene {
     let ribbonHolder = Entity()
     var craftModel: Entity?
     var poser: CraftPoser?
+    var windsock: Entity?
+
+    /// Head yaw to the downwind direction, sock sag from speed: calm -76 deg, breeze -28 deg, level at 10 m/s.
+    func poseWindsock(_ wind: Wind) {
+        guard let windsock, !PartMeshFactory.isPlaceholder(windsock) else { return }
+        let v = wind.vector(altitude: 6)
+        let speed = Float(simd_len(v))
+        let d = rk(v)
+        let yaw = speed > 0.01 ? atan2(-d.z, d.x) * 180 / .pi : 0
+        let sag: Float = speed >= 10 ? 0 : speed >= 5 ? -28 + 28 * (speed - 5) / 5 : -76 + 48 * speed / 5
+        windsock.setJoints(["head": yaw, "sock": sag])
+    }
     var plume: ModelEntity?
     var drogue: ModelEntity?
     var mainChute: ModelEntity?
     var marker: ModelEntity?
     var hud: Entity?
     var callout: Entity?
+    var deck: Entity?
     let indicators = SpatialIndicators()
     /// Highest predicted sample, course frame, for the walkthrough's path step.
     private(set) var ribbonApex: Vec3?
@@ -153,10 +180,15 @@ final class RangeScene {
 
     func updateIndicators(_ model: AppModel, dt: Float) {
         indicators.tick(dt)
-        guard let step = model.walkthrough.current, let callout else { indicators.hideAll(); return }
-        let from = callout.position(relativeTo: nil) + [0, -0.1, 0]
+        let target: WalkTarget?
+        let anchor: Entity?
+        if let step = model.walkthrough.current { target = step.target; anchor = callout }
+        else if model.learnActive, model.flight.phase != .flying { target = Self.lessonTarget(model.lessonStage); anchor = deck }
+        else { indicators.hideAll(); return }
+        guard let anchor else { indicators.hideAll(); return }
+        let from = anchor.position(relativeTo: nil) + [0, -0.1, 0]
         let s = root.scale.x
-        switch step.target {
+        switch target {
         case .pad:
             indicators.show(beacon: true, haloAt: nil, leader: (from, root.convert(position: [0, 4, 0], to: nil)))
         case .ribbon:
@@ -172,6 +204,15 @@ final class RangeScene {
         }
     }
 
+    /// What the lesson deck points at for each stage.
+    static func lessonTarget(_ stage: LessonStage) -> WalkTarget? {
+        switch stage {
+        case .concept, .pseudocode: .craft
+        case .implement, .analyze: .ribbon
+        case .run: .pad
+        }
+    }
+
     func playSuccess() {
         guard let callout else { return }
         indicators.playBurst(at: callout.position(relativeTo: nil))
@@ -180,33 +221,50 @@ final class RangeScene {
     func buildStatic(course: Course) async {
         if !builtStatic {
             builtStatic = true
-            // Desert floor.
-            let ground = ModelEntity(mesh: .generatePlane(width: 6000, depth: 6000), materials: [PartMeshFactory.paint(0xC2A27A, rough: 0.95)])
-            ground.position = [0, -0.02, 0]
-            staticHolder.addChild(ground)
-            staticHolder.addChild(await PartMeshFactory.entity("launch-pad").withPosition([0, -0.6, 0]))
-            staticHolder.addChild(await PartMeshFactory.entity("launch-tower").withPosition([3.2, 0, 0]))
-            staticHolder.addChild(await PartMeshFactory.entity("viewing-platform").withPosition([0, 0, 60]))
-            // Existing RealityHD environment assets.
-            var rng = SplitMix64(seed: 42)
-            for i in 0..<28 {
-                let a = rng.unit() * 2 * .pi, d = 40 + rng.unit() * 380
-                let p = SIMD3<Float>(Float(cos(a) * d), 0, Float(sin(a) * d))
-                if abs(p.x) < 15 && p.z > -20 && p.z < 80 { continue }
-                if let e = try? await RealityHD.entity(i % 3 == 0 ? "boulder" : "shrub", seed: UInt64(i + 1)) {
-                    e.position = p
-                    e.scale = .init(repeating: i % 3 == 0 ? Float(1.5 + rng.unit() * 2) : 1)
-                    staticHolder.addChild(e)
+            // Base environment: RealityHD "aerospace-range" (pad, tower, blockhouse, runway, platform, scrub).
+            // Fallback: an outdoor desert floor with placeholder pad props.
+            if let range = try? await RealityHD.scene("aerospace-range", seed: 1) {
+                // Mount-ring top (deck 1 m - 0.05 sink + ring 1.2 m) at y = 0 where the craft stands, and the scene's
+                // viewing platform at (-42, 43) turned 44.3 deg onto the app's viewer line 60 m south of the pad.
+                range.position = [0, -2.15, 0]
+                range.orientation = simd_quatf(angle: atan2(42, 43), axis: [0, 1, 0])
+                staticHolder.addChild(range)
+            } else {
+                // Desert floor.
+                let ground = ModelEntity(mesh: .generatePlane(width: 6000, depth: 6000), materials: [PartMeshFactory.paint(0xC2A27A, rough: 0.95)])
+                ground.position = [0, -0.02, 0]
+                staticHolder.addChild(ground)
+                staticHolder.addChild(await PartMeshFactory.entity("launch-pad").withPosition([0, -0.6, 0]))
+                staticHolder.addChild(await PartMeshFactory.entity("launch-tower").withPosition([3.2, 0, 0]))
+                staticHolder.addChild(await PartMeshFactory.entity("viewing-platform").withPosition([0, 0, 60]))
+                // Existing RealityHD environment assets.
+                var rng = SplitMix64(seed: 42)
+                for i in 0..<28 {
+                    let a = rng.unit() * 2 * .pi, d = 40 + rng.unit() * 380
+                    let p = SIMD3<Float>(Float(cos(a) * d), 0, Float(sin(a) * d))
+                    if abs(p.x) < 15 && p.z > -20 && p.z < 80 { continue }
+                    if let e = try? await RealityHD.entity(i % 3 == 0 ? "boulder" : "shrub", seed: UInt64(i + 1)) {
+                        e.position = p
+                        e.scale = .init(repeating: i % 3 == 0 ? Float(1.5 + rng.unit() * 2) : 1)
+                        staticHolder.addChild(e)
+                    }
                 }
+                for (i, p) in [SIMD3<Float>(-4, 0, 57), [-4.8, 0, 56.4], [4.5, 0, 57.5]].enumerated() {
+                    if let e = try? await RealityHD.entity("oil-drum", seed: UInt64(i + 1)) { e.position = p; staticHolder.addChild(e) }
+                }
+                if let e = try? await RealityHD.entity("cable-spool", seed: 1) { e.position = [6, 0, 4]; staticHolder.addChild(e) }
             }
-            for (i, p) in [SIMD3<Float>(-4, 0, 57), [-4.8, 0, 56.4], [4.5, 0, 57.5]].enumerated() {
-                if let e = try? await RealityHD.entity("oil-drum", seed: UInt64(i + 1)) { e.position = p; staticHolder.addChild(e) }
-            }
-            if let e = try? await RealityHD.entity("cable-spool", seed: 1) { e.position = [6, 0, 4]; staticHolder.addChild(e) }
             env?.illuminate(staticHolder)
         }
         guard builtCourse != course.id else { return }
         builtCourse = course.id
+        // Live windsock beside the viewer, posed from the course wind (the scene's own sock is baked).
+        windsock?.removeFromParent()
+        let sock = await PartMeshFactory.entity("windsock")
+        sock.position = rk(Vec3(14, -52, 0))
+        staticHolder.addChild(sock)
+        windsock = sock
+        poseWindsock(course.wind)
         courseHolder.children.removeAll()
         gateBeacons.removeAll()
         // Landing zone pylons.
@@ -224,10 +282,12 @@ final class RangeScene {
         // Ring gates: try RealityHD "ring-gate", else a torus placeholder; uniform scale r / 3.5, base hidden above 20 m.
         for g in course.gates {
             let gate = await PartMeshFactory.entity("ring-gate")
-            if g.centre.z > 20, gate.children.count > 1 { gate.children[1].isEnabled = false }
+            let placeholder = PartMeshFactory.isPlaceholder(gate)
+            if placeholder, g.centre.z > 20, gate.children.count > 1 { gate.children[1].isEnabled = false }
             let s = Float(g.innerRadius / 3.5)
             gate.scale = .init(repeating: s)
-            gate.position = rk(g.centre) - [0, 4.5 * s, 0]
+            // RealityHD ring-gate: 8 m ring on an A-frame, ring centre 4 m below its 9.02 m top.
+            gate.position = rk(g.centre) - [0, (placeholder ? 4.5 : 5.02) * s, 0]
             courseHolder.addChild(gate)
             // Number label pole for orientation.
             let beacon = ModelEntity(mesh: .generateSphere(radius: 1.2), materials: [PartMeshFactory.unlit(0xF2C230)])

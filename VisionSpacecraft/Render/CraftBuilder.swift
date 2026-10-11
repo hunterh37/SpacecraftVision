@@ -35,12 +35,12 @@ enum CraftBuilder {
                 let ang: Float
                 if count > 1 { ang = Float(k) / Float(count) * 2 * .pi + .pi / 4 } else { ang = Float(base) * 1.1 + 0.4 }
                 let rr = Float(span.dia / 2)
-                let y: Float = r.partId == "fin-trapezoid" ? Float(span.bottom) : Float((span.bottom + span.top) / 2) - 0.1
+                let y: Float = r.partId == "fin-trapezoid" || r.partId == "engine-solid-small" ? Float(span.bottom) : Float((span.bottom + span.top) / 2) - 0.1
                 let rot = simd_quatf(angle: -ang, axis: [0, 1, 0])
                 e.orientation = rot
                 e.position = rot.act([rr, y, 0])
-                if r.partId != "fin-trapezoid" {
-                    // Small sensors sit on the skin; rotate so their local +x faces outward only for flat parts.
+                if PartMeshFactory.isPlaceholder(e), r.partId != "fin-trapezoid" {
+                    // Placeholders stand 5 cm off the skin; RealityHD parts are mounted on it (PartMeshFactory.mounted).
                     e.position = rot.act([rr + 0.05, y, 0])
                 }
                 root.addChild(e)

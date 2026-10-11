@@ -29,7 +29,7 @@ struct SettingsView: View {
                     .labCard(padding: 16)
                     LabCaption("Replay a tour", tint: Brand.trajectory).padding(.top, 6)
                     VStack(spacing: 10) {
-                        ForEach([TourID.range]) { t in   // the demo flow only has the launch-range tour
+                        ForEach(TourID.allCases) { t in
                             HStack {
                                 Text(t.title).font(Lab.soft(15))
                                 Spacer()

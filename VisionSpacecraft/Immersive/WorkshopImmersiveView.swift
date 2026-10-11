@@ -11,6 +11,8 @@ struct WorkshopImmersiveView: View {
     @State private var craftHolder = Entity()
     @State private var env: RealEnvironment?
     @State private var skyHolder = Entity()
+    @State private var stage = AssemblyStage()
+    @State private var held: Int?
     @State private var sun = Entity()
     @State private var looseParts = Entity()
     /// Loose parts on stands; drag one onto the build square to add it to the craft.
@@ -31,11 +33,26 @@ struct WorkshopImmersiveView: View {
             content.add(skyHolder)
             content.add(sun)
             updateSky()
-            root.addChild(await Self.hangarShell())
+            // Base: RealityHD "aerospace-hangar" turned 180 deg so its gantry bay sits behind the viewer and the
+            // build square 3 m ahead stays clear. Fallback: the procedural shell plus loose clutter props.
+            let hangar = try? await RealityHD.scene("aerospace-hangar", seed: 1)
+            if let hangar {
+                hangar.orientation = simd_quatf(angle: .pi, axis: [0, 1, 0])
+                root.addChild(hangar)
+            } else {
+                root.addChild(await Self.hangarShell())
+            }
             root.addChild(looseParts)
             await spawnLooseParts()
             craftHolder.position = [0, 0, -3]
             root.addChild(craftHolder)
+            craftHolder.addChild(stage.ghost)
+            root.addChild(stage.rack)
+            if let card = attachments.entity(for: "assembly") {
+                card.position = [-1.3, 1.55, -2.0]
+                card.orientation = simd_quatf(angle: 0.45, axis: [0, 1, 0])
+                root.addChild(card)
+            }
             if let board = attachments.entity(for: "board") {
                 board.position = [1.7, 1.45, -2.6]
                 board.orientation = simd_quatf(angle: -0.35, axis: [0, 1, 0])
@@ -54,7 +71,7 @@ struct WorkshopImmersiveView: View {
                 ("safety-glasses", [5.0, 0.95, -3.3], 1, 1), ("utility-cabinet", [-14.6, 0, -6], 1.57, 1),
                 ("pallet", [-5.7, 0, -3.5], 0, 2), ("pallet", [-5.7, 0, -2.4], 0, 3),
             ]
-            for (id, p, yaw, seed) in props {
+            for (id, p, yaw, seed) in props where hangar == nil {
                 if let e = try? await RealityHD.entity(id, seed: seed) {
                     e.position = p
                     e.orientation = simd_quatf(angle: yaw, axis: [0, 1, 0])
@@ -68,6 +85,54 @@ struct WorkshopImmersiveView: View {
                 StatBoardView()
                     .environment(model)
             }
+            Attachment(id: "assembly") {
+                AssemblyCardView()
+                    .environment(model)
+            }
+        }
+        .gesture(DragGesture(minimumDistance: 0.01, coordinateSpace: .local).targetedToAnyEntity()
+            .onChanged { v in
+                let a = model.assembly
+                guard a.mode == .manual, !a.showMe, let plan = a.plan, let i = AssemblyStage.rackIndex(of: v.entity) else { return }
+                held = i
+                let hand = v.convert(v.location3D, from: .local, to: .scene)
+                let heavy = plan.steps[i].instance.definition.length > 2
+                let r = stage.drag(i, hand: hand, current: a.index, target: stage.target(plan: plan, index: a.index, craftHolder: craftHolder),
+                                   heavy: heavy)
+                if r == .wrong, let cur = a.current {
+                    a.warning = "\(cur.instance.definition.displayName) goes here. Put the \(plan.steps[i].instance.definition.displayName) back."
+                } else if r == .snapped { a.warning = nil }
+            }
+            .onEnded { _ in
+                guard let i = held else { return }
+                held = nil
+                let a = model.assembly
+                if stage.snapped, i == a.index, let plan = a.plan, let t = stage.target(plan: plan, index: i, craftHolder: craftHolder) {
+                    stage.flash(at: t, in: craftHolder.parent ?? craftHolder)
+                    a.lock(model)
+                } else {
+                    stage.release(i)
+                }
+            })
+        .task(id: StageKey(index: model.assembly.index, mode: model.assembly.mode, plan: model.assembly.plan?.target.id,
+                           table: model.workshopTabletop)) {
+            let a = model.assembly
+            await stage.rebuild(plan: a.plan, index: a.index, showRack: a.active, craftHolder: craftHolder)
+            env?.illuminate(stage.rack)
+        }
+        .task(id: PlayKey(index: model.assembly.index, playing: model.assembly.playing, showMe: model.assembly.showMe,
+                          mode: model.assembly.mode)) {
+            let a = model.assembly
+            guard (a.mode == .watch && a.playing) || (a.mode == .manual && a.showMe), let plan = a.plan, a.index < plan.count else { return }
+            // Let the rack rebuild for this index first.
+            try? await Task.sleep(for: .milliseconds(350))
+            guard !Task.isCancelled, let t = stage.target(plan: plan, index: a.index, craftHolder: craftHolder) else { return }
+            await stage.autoPlace(a.index, target: t, speed: a.speed)
+            guard !Task.isCancelled else { return }
+            stage.flash(at: t, in: craftHolder.parent ?? craftHolder)
+            a.showMe = false
+            a.lock(model)
+            try? await Task.sleep(for: .seconds(0.3 / a.speed))
         }
         .gesture(DragGesture().targetedToEntity(where: .has(LoosePartComponent.self))
             .onChanged { v in
@@ -83,7 +148,7 @@ struct WorkshopImmersiveView: View {
             })
         .task(id: CraftKey(craft: model.craft, sel: model.selectedStackPart, table: model.workshopTabletop)) {
             let e = await CraftBuilder.build(model.craft, markers: true, highlight: model.selectedStackPart)
-            craftHolder.children.removeAll()
+            craftHolder.children.filter { $0.name == "craft" }.forEach { $0.removeFromParent() }
             craftHolder.addChild(e)
             if model.workshopTabletop {
                 // 1:20 model on the workbench.
@@ -99,6 +164,8 @@ struct WorkshopImmersiveView: View {
     }
 
     struct CraftKey: Hashable { var craft: CraftDesign; var sel: UUID?; var table: Bool }
+    struct StageKey: Hashable { var index: Int; var mode: AssemblyModel.Mode; var plan: UUID?; var table: Bool }
+    struct PlayKey: Hashable { var index: Int; var playing: Bool; var showMe: Bool; var mode: AssemblyModel.Mode }
 
     private func updateSky() {
         skyHolder.children.removeAll()

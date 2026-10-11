@@ -50,12 +50,17 @@ final class AppModel {
     // Flight
     let flight = FlightController()
     let walkthrough = WalkthroughModel()
+    let assembly = AssemblyModel()
     /// Set when the Analysis window first appears (walkthrough step 5).
     var analysisOpened = false
 
     // Walkthrough signals (Walkthrough/WalkthroughModel.swift predicates and demos)
     var homePath = NavigationPath()
     var openLesson: Lesson?
+    /// Learn mode runs inside the range: the 3D lesson deck replaces the main window.
+    var learnActive = false
+    /// First lesson without stars, else the last one.
+    var nextLesson: Lesson { Lesson.all.first { completed[$0.id] == nil } ?? Lesson.all[Lesson.all.count - 1] }
     var pseudocodeDemo = 0
     var codeOpened = false
     var missionPicked = false
@@ -162,6 +167,7 @@ final class AppModel {
 
     func addPart(_ id: String) {
         guard let def = PartCatalog.part(id), addBlock(id) == nil else { return }
+        assembly.stop()
         partsAdded += 1
         if def.mount == .stack {
             var inst = PartInstance(partId: id, fuelLoad: mission.fixedFuelLoad ?? 1.0)
@@ -187,14 +193,16 @@ final class AppModel {
     }
 
     func removeStack(_ id: UUID) {
+        assembly.stop()
         craft.stack.removeAll { $0.id == id }
         craft.radial.removeAll { $0.parentId == id }
         schedulePreview()
     }
 
-    func removeRadial(_ id: UUID) { craft.radial.removeAll { $0.id == id }; schedulePreview() }
+    func removeRadial(_ id: UUID) { assembly.stop(); craft.radial.removeAll { $0.id == id }; schedulePreview() }
 
     func moveStack(_ id: UUID, by d: Int) {
+        assembly.stop()
         guard let i = craft.stack.firstIndex(where: { $0.id == id }) else { return }
         let j = i + d
         guard craft.stack.indices.contains(j) else { return }
@@ -208,21 +216,35 @@ final class AppModel {
         schedulePreview()
     }
 
+    func referenceCraft() -> CraftDesign {
+        var c: CraftDesign = mission.id == "M2" ? .rGates() : .rHop(fuelLoad: mission.fixedFuelLoad ?? 0.1)
+        c.payloadMass = mission.payloadMass
+        return c
+    }
+
     func loadReferenceCraft() {
         referenceLoads += 1
-        craft = mission.id == "M2" ? .rGates() : .rHop(fuelLoad: mission.fixedFuelLoad ?? 0.1)
-        craft.payloadMass = mission.payloadMass
+        assembly.stop()
+        craft = referenceCraft()
+        schedulePreview()
+    }
+
+    /// Guided build writes (specs/18).
+    func setAssembledCraft(_ c: CraftDesign) {
+        craft = c
+        selectedStackPart = nil
         schedulePreview()
     }
 
     /// Saturn V Apollo stack (RealityHD stage assets, AS-506 masses).
     func loadSaturnV() {
+        assembly.stop()
         craft = .saturnV()
         selectedStackPart = nil
         schedulePreview()
     }
 
-    func clearCraft() { craft.stack = []; craft.radial = []; schedulePreview() }
+    func clearCraft() { assembly.stop(); craft.stack = []; craft.radial = []; schedulePreview() }
 
     // MARK: Preview
 

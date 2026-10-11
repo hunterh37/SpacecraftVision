@@ -19,6 +19,7 @@ enum PartMeshFactory {
     static let articulatedIds: Set<String> = [
         "command-pod", "engine-solid-small", "engine-liquid-small", "engine-prop", "decoupler", "parachute",
         "fin-trapezoid", "wing-section", "elevon", "landing-gear", "solar-panel", "lidar-sensor",
+        "windsock", "gantry-crane",
     ]
 
     static func entity(_ id: String, seed: UInt64 = 1, state: String? = nil) async -> Entity {
@@ -26,17 +27,42 @@ enum PartMeshFactory {
             if articulatedIds.contains(id),
                let e = try? await RealityHD.articulated(id, seed: seed, state: state, interactive: false, grabbable: false) {
                 e.name = id
-                return e
+                return mounted(id, e)
             }
             do {
                 let e = try await RealityHD.entity(id, seed: seed)
                 e.name = id
-                return e
+                return mounted(id, e)
             } catch {
                 missing.insert(id)
             }
         }
         return placeholder(id)
+    }
+
+    /// RealityHD authors some parts in their own frame; this wraps them into the craft frame the builder
+    /// uses (stack parts: base at y = 0, axis +y; radial parts: root at x = 0, extending along +x, sensors
+    /// with their base on the skin). Offsets come from `realityhd stats` bounds at RealityHD b5dd02b.
+    static func mounted(_ id: String, _ e: Entity) -> Entity {
+        let toX = simd_quatf(angle: -.pi / 2, axis: [0, 0, 1])   // local +y -> +x
+        let xToY = simd_quatf(angle: .pi / 2, axis: [0, 0, 1])   // local +x -> +y
+        let (rot, off): (simd_quatf, SIMD3<Float>)
+        switch id {
+        case "fuselage-section": (rot, off) = (xToY, [0, 1.00645, 0])        // barrel authored along x, 2.01 m
+        case "fin-trapezoid": (rot, off) = (toX, [0, 0.464, 0])               // span +y -> outward, chord along y
+        case "wing-section": (rot, off) = (simd_quatf(angle: 0, axis: [0, 1, 0]), [2.025, 0, 0])
+        case "elevon": (rot, off) = (simd_quatf(angle: 0, axis: [0, 1, 0]), [0.512, 0, 0])
+        case "solar-panel": (rot, off) = (simd_quatf(angle: 0, axis: [0, 1, 0]), [0.8, 0, 0])
+        case "engine-solid-small": (rot, off) = (simd_quatf(angle: 0, axis: [0, 1, 0]), [0.326, 0, 0])  // lugs on -x touch the skin
+        case "lidar-sensor", "radar-sensor", "camera-sensor", "imu", "battery-pack": (rot, off) = (toX, .zero)
+        default: return e
+        }
+        let m = Entity()
+        m.name = id + "-mount"
+        e.orientation = rot
+        e.position = off
+        m.addChild(e)
+        return m
     }
 
     /// True when the entity came from RealityHD (placeholders carry no RealityHD components).
