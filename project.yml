@@ -12,6 +12,9 @@ packages:
     path: Packages/SpacecraftKit
   TaskGuideKit:
     path: Packages/TaskGuideKit
+  DicyaninStageDirector:
+    url: https://github.com/hunterh37/DicyaninStageDirector.git
+    from: 0.1.0
 targets:
   VisionSpacecraft:
     type: application
@@ -37,6 +40,7 @@ targets:
         product: TaskGuideCore
       - package: TaskGuideKit
         product: TaskGuideUI
+      - package: DicyaninStageDirector
     settings:
       base:
         SWIFT_VERSION: "6.0"

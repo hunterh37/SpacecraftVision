@@ -186,12 +186,13 @@ private struct MarbleGame: View {
     var body: some View {
         VStack {
             GeometryReader { geo in
-                let s = min(geo.size.width, geo.size.height) / 20
+                let s: CGFloat = min(geo.size.width, geo.size.height) / 20
                 Canvas { ctx, size in
-                    func pt(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: size.width / 2 + x * s, y: size.height / 2 - y * s) }
-                    for h in m.hills { ctx.fill(Path(ellipseIn: CGRect(x: pt(h.x, h.y).x - s, y: pt(h.x, h.y).y - s, width: 2 * s, height: 2 * s)), with: .color(.brown.opacity(0.6))) }
-                    ctx.fill(Path(ellipseIn: CGRect(x: pt(0, 8).x - 8, y: pt(0, 8).y - 8, width: 16, height: 16)), with: .color(.green.opacity(0.5)))
-                    ctx.fill(Path(ellipseIn: CGRect(x: pt(m.x, m.y).x - 6, y: pt(m.x, m.y).y - 6, width: 12, height: 12)), with: .color(.accentColor))
+                    func pt(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: size.width / 2 + CGFloat(x) * s, y: size.height / 2 - CGFloat(y) * s) }
+                    func dot(_ c: CGPoint, _ r: CGFloat) -> Path { Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r)) }
+                    for h in m.hills { ctx.fill(dot(pt(h.x, h.y), s), with: .color(.brown.opacity(0.6))) }
+                    ctx.fill(dot(pt(0, 8), 8), with: .color(.green.opacity(0.5)))
+                    ctx.fill(dot(pt(m.x, m.y), 6), with: .color(.accentColor))
                 }
                 .contentShape(Rectangle())
                 .onTapGesture { p in m.place(.init(x: (p.x - geo.size.width / 2) / s, y: (geo.size.height / 2 - p.y) / s)) }
@@ -316,9 +317,10 @@ private struct TreeGame: View {
     var body: some View {
         VStack {
             GeometryReader { geo in
-                let s = geo.size.height / 11
-                func pt(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: geo.size.width / 2 + x * s, y: geo.size.height - y * s) }
+                let s: CGFloat = geo.size.height / 11
+                let w: CGFloat = geo.size.width, hgt: CGFloat = geo.size.height
                 Canvas { ctx, _ in
+                    func pt(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: w / 2 + CGFloat(x) * s, y: hgt - CGFloat(y) * s) }
                     for b in t.blocks { ctx.fill(Path(ellipseIn: CGRect(x: pt(b.x, b.y).x - b.r * s, y: pt(b.x, b.y).y - b.r * s, width: 2 * b.r * s, height: 2 * b.r * s)), with: .color(.gray)) }
                     for n in t.nodes { if let p = n.parent { var l = Path(); l.move(to: pt(t.nodes[p].x, t.nodes[p].y)); l.addLine(to: pt(n.x, n.y)); ctx.stroke(l, with: .color(.green), lineWidth: 2) } }
                     var top = Path(); top.move(to: pt(-6, t.top)); top.addLine(to: pt(6, t.top)); ctx.stroke(top, with: .color(.orange), lineWidth: 1)

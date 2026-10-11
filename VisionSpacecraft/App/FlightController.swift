@@ -41,6 +41,7 @@ final class FlightController {
 
     func launch(source: String, craft: CraftDesign, mission: Mission) {
         launchError = nil
+        replay = nil; replayPlaying = false
         if let b = mission.blockers(for: craft).first {
             launchError = "Cannot launch. \(b.title). \(b.body)"
             return
@@ -83,8 +84,46 @@ final class FlightController {
         launchID += 1
     }
 
+    // MARK: Replay (specs/08): plays recorded samples through the same snapshot the scene reads.
+
+    private(set) var replay: ReplayCursor?
+    private(set) var replayName = ""
+    var replayTime = 0.0
+    var replayPlaying = false
+    var replaySpeed = 1.0
+    var replayDuration: Double { replay?.duration ?? 0 }
+
+    func startReplay(_ record: FlightRecord) {
+        sim = nil; guidance = nil
+        replay = ReplayCursor(samples: record.samples)
+        replayName = record.name
+        replayTime = 0; replayPlaying = true; replaySpeed = 1
+        launchID += 1
+        phase = .finished
+        seekReplay(0)
+    }
+
+    func stopReplay() {
+        replay = nil; replayPlaying = false
+        reset()
+    }
+
+    func seekReplay(_ t: Double) {
+        guard let replay, let s = replay.sample(at: t) else { return }
+        replayTime = min(max(t, 0), replay.duration)
+        altitude = s.position.z; speed = s.speed; throttle = s.throttle; fuel = s.fuel; energy = s.energy
+        time = s.t; position = s.position; pitch = s.pitch; yaw = s.yaw; verticalSpeed = s.velocity.z
+    }
+
     /// Advance by real seconds.
     func tick(_ dt: Double) {
+        if replay != nil {
+            if replayPlaying {
+                seekReplay(replayTime + min(dt, 0.1) * replaySpeed)
+                if replayTime >= replayDuration { replayPlaying = false }
+            }
+            return
+        }
         guard phase == .flying, let sim else { return }
         var scale = timeScale
         if let until = slowMoUntil {

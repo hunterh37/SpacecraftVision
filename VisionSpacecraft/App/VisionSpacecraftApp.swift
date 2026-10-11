@@ -2,6 +2,9 @@ import SwiftUI
 import RealKit
 import RealLibrary
 import Curriculum
+#if DEBUG
+import DicyaninStageDirector
+#endif
 
 @main
 struct VisionSpacecraftApp: App {
@@ -21,6 +24,9 @@ struct VisionSpacecraftApp: App {
                 .environment(model)
                 .overlay { SceneLoadingOverlay(space: model.loadingSpace) }
                 .modifier(DebugLaunch(model: model))
+                #if DEBUG
+                .director { [model] in DemoRoutes.register($0, model: model) }
+                #endif
         }
         .windowStyle(.plain)
         .defaultSize(width: 900, height: 700)

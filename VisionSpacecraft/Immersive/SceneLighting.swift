@@ -5,7 +5,7 @@ import SpacecraftCore
 @MainActor
 enum SceneLighting {
     static func update(sun: Entity, fill: Entity? = nil, style: SkyStyle, timeOfDay: TimeOfDay) {
-        let evening = style == .sunset || (style == .mission && timeOfDay != .morning)
+        let evening = style == .sunset || (style == .mission && timeOfDay == .golden)
         sun.components.set(DirectionalLightComponent(
             color: evening ? UIColor(red: 1, green: 0.72, blue: 0.48, alpha: 1) : UIColor(red: 1, green: 0.94, blue: 0.83, alpha: 1),
             intensity: evening ? 3_500 : 8_000

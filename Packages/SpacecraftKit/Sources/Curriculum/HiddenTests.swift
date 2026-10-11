@@ -79,5 +79,77 @@ public enum HiddenTests {
                 return h.entry("bug", "mode")?.text == "go"
             }),
         ],
+        4: [
+            ("test_offset_sign", { h in
+                h.values["position"] = .vec(0, 0, 120); h.values["goal_position"] = .vec(0, 1600, 120)
+                h.call("setup")
+                h.values["position"] = .vec(10, 100, 120)
+                return (h.call("mline_offset")?.number ?? 0) > 0
+            }),
+            ("test_hit_stores_goal_distance", { h in
+                h.values["goal_position"] = .vec(0, 1600, 120); h.call("setup")
+                h.lidarAt = { _ in 50 }; h.values["goal"] = .vec(0, 0, 800)
+                h.call("update", [.float(0.02)])
+                return h.entry("bug", "mode")?.text == "follow" && near(h.entry("bug", "hit_d")?.number, 800, 1)
+            }),
+            ("test_follow_turns_left_on_front", { h in
+                h.values["goal_position"] = .vec(0, 1600, 120); h.call("setup")
+                h.setEntry("bug", "mode", .str("follow")); h.lidarAt = { _ in 50 }; h.values["goal"] = .vec(0, 0, 800)
+                h.call("update", [.float(0.02)])
+                return (h.last("set_yaw") ?? 0) < 0
+            }),
+            ("test_leave_requires_progress", { h in
+                h.values["goal_position"] = .vec(0, 1600, 120); h.call("setup")
+                h.setEntry("bug", "mode", .str("follow")); h.setEntry("bug", "away", .bool(true))
+                h.setEntry("bug", "hit_d", .float(800)); h.lidarAt = { _ in -1 }
+                h.values["position"] = .vec(0, 800, 120); h.values["goal"] = .vec(0, 0, 798)
+                h.call("update", [.float(0.02)])
+                return h.entry("bug", "mode")?.text == "follow"
+            }),
+            ("test_leave_requires_mline", { h in
+                h.values["goal_position"] = .vec(0, 1600, 120); h.call("setup")
+                h.setEntry("bug", "mode", .str("follow")); h.setEntry("bug", "away", .bool(true))
+                h.setEntry("bug", "hit_d", .float(800)); h.lidarAt = { _ in -1 }
+                h.values["position"] = .vec(40, 900, 120); h.values["goal"] = .vec(0, 0, 700)
+                h.call("update", [.float(0.02)])
+                let stayed = h.entry("bug", "mode")?.text == "follow"
+                h.values["position"] = .vec(0, 900, 120)
+                h.call("update", [.float(0.02)])
+                return stayed && h.entry("bug", "mode")?.text == "go"
+            }),
+        ],
+        5: [
+            ("test_attraction_only_points_at_goal", { h in
+                h.lidarAt = { _ in -1 }; h.values["goal"] = .vec(0.5, 0, 1000)
+                let f = h.call("force")?.items.compactMap(\.number) ?? []
+                return f.count == 2 && near(atan2(f[0], f[1]), 0.5, 1e-6)
+            }),
+            ("test_repulsion_zero_beyond_r0", { h in
+                h.lidarAt = { _ in 500 }; h.values["goal"] = .vec(0.3, 0, 1000)
+                let f = h.call("force")?.items.compactMap(\.number) ?? []
+                return f.count == 2 && near(atan2(f[0], f[1]), 0.3, 1e-6)
+            }),
+            ("test_repulsion_grows_closer", { h in
+                h.values["goal"] = .vec(0, 0, 1000)
+                h.lidarAt = { a in a == 0 ? 90 : -1 }
+                let far = h.call("force")?.items.compactMap(\.number).last ?? 0
+                h.lidarAt = { a in a == 0 ? 40 : -1 }
+                let close = h.call("force")?.items.compactMap(\.number).last ?? 0
+                return close < far
+            }),
+            ("test_symmetric_hits_cancel_sideways", { h in
+                h.values["goal"] = .vec(0, 0, 1000)
+                h.lidarAt = { a in abs(a) == 30 ? 60 : -1 }
+                let f = h.call("force")?.items.compactMap(\.number) ?? [1, 0]
+                return abs(f[0]) < 1e-6
+            }),
+            ("test_escape_after_stall", { h in
+                h.lidarAt = { _ in -1 }; h.values["goal"] = .vec(0, 0, 995)
+                h.setEntry("pf", "t_check", .float(0)); h.setEntry("pf", "d_check", .float(1000))
+                h.values["time"] = .float(20)
+                h.call("force")
+                return (h.entry("pf", "escape_until")?.number ?? -1) > 20
+            }),
+        ],
     ]
 }

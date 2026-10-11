@@ -25,6 +25,7 @@ enum CraftBuilder {
             spanOf[p.id] = (spans[i].bottom, spans[i].top, p.definition.diameter)
         }
         var slot: [UUID: Int] = [:]
+        let aircraft = craft.radial.contains { $0.partId == "wing-section" }
         for r in craft.radial {
             guard let pid = r.parentId, let span = spanOf[pid] else { continue }
             let count = max(1, r.count)
@@ -33,7 +34,9 @@ enum CraftBuilder {
                 let e = await PartMeshFactory.entity(r.partId)
                 e.components.set(PartTagComponent(partId: r.partId))
                 let ang: Float
-                if count > 1 { ang = Float(k) / Float(count) * 2 * .pi + .pi / 4 } else { ang = Float(base) * 1.1 + 0.4 }
+                if aircraft && ["wing-section", "elevon"].contains(r.partId) { ang = Float(k) * .pi }   // local x: wings level
+                else if aircraft && r.partId == "fin-trapezoid" && count == 1 { ang = .pi / 2 }        // local z: vertical fin
+                else if count > 1 { ang = Float(k) / Float(count) * 2 * .pi + .pi / 4 } else { ang = Float(base) * 1.1 + 0.4 }
                 let rr = Float(span.dia / 2)
                 let y: Float = r.partId == "fin-trapezoid" || r.partId == "engine-solid-small" ? Float(span.bottom) : Float((span.bottom + span.top) / 2) - 0.1
                 let rot = simd_quatf(angle: -ang, axis: [0, 1, 0])

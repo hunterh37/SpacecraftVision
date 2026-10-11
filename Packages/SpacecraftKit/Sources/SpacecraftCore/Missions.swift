@@ -205,7 +205,7 @@ public struct Mission: Codable, Sendable, Hashable, Identifiable {
     /// Aircraft missions: `parFuel` is energy in Wh (specs/15 C4 par).
     public static let m4 = Mission(id: "M4", title: "Field", lesson: 4, courseId: "C4", payloadMass: 20, massCap: 600, partCap: 18,
                                    budget: 28_000, energyCap: 5_000, fixedFuelLoad: nil, allowedParts: aircraftParts, goal: .gates,
-                                   parFuel: 600, parClearance: 25)
+                                   parFuel: 600, parClearance: 8)
     public static let m5 = Mission(id: "M5", title: "Canyon", lesson: 6, courseId: "C5", payloadMass: 20, massCap: 600, partCap: 18,
                                    budget: 28_000, energyCap: 5_000, fixedFuelLoad: nil, allowedParts: aircraftParts, goal: .gates,
                                    parFuel: 900, parClearance: 20)

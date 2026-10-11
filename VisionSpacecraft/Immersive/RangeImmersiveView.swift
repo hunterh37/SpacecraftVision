@@ -21,7 +21,7 @@ struct RangeImmersiveView: View {
         RealityView { content, attachments in
             // The range is outdoors: sun-and-sky lighting for the course's time of day. The sky you see is the
             // photographic dome in skyHolder, so the procedural skybox stays off.
-            if let env = try? RealEnvironment({ var s = model.mission.course.timeOfDay == .morning ? SunSky.morning : SunSky.afternoon
+            if let env = try? RealEnvironment({ var s = model.mission.course.timeOfDay == .morning ? SunSky.morning : model.mission.course.timeOfDay == .golden ? SunSky.goldenHour : SunSky.afternoon
                                                 s.fogDensity = 0.00015; return s }(), skybox: false) {
                 content.add(env.root)
                 scene.env = env
@@ -55,6 +55,8 @@ struct RangeImmersiveView: View {
                 scene.deck = deck
             }
             content.add(scene.indicators.world)
+            content.add(scene.vignette.root)
+            scene.audio.attach(craft: scene.craftHolder, listener: scene.skyHolder)
             await scene.buildStatic(course: model.mission.course)
             await scene.rebuildCraft(model.craft)
             scene.applyView(model.flightView, course: model.mission.course)
@@ -95,7 +97,10 @@ struct RangeImmersiveView: View {
             scene.rebuildRibbon(model.preview, view: model.flightView)
             scene.applyView(model.flightView, course: model.mission.course)
         }
-        .onChange(of: model.flight.launchID) { scene.resetCraftPose(); scene.resetGates() }
+        .onChange(of: model.flight.launchID) { scene.resetCraftPose(); scene.resetGates(); scene.audio.cue("launch") }
+        .onChange(of: model.flight.phase) { _, p in
+            if p == .finished { scene.audio.cue(model.flight.sim?.result?.passed == true ? "pass" : "fail") }
+        }
         .onChange(of: model.flight.gates) { _, n in scene.markGatePassed(n) }
         .onChange(of: model.walkthrough.successCount) { scene.playSuccess() }
         .onAppear { if !model.learnActive { model.walkthrough.startIfNeeded() } }
@@ -132,6 +137,10 @@ final class RangeScene {
     var craftModel: Entity?
     var poser: CraftPoser?
     var windsock: Entity?
+    let props = CourseProps()
+    let audio = FlightAudio()
+    let vignette = ComfortVignette()
+    private var lastViewDir: SIMD3<Float>?
 
     /// Head yaw to the downwind direction, sock sag from speed: calm -76 deg, breeze -28 deg, level at 10 m/s.
     func poseWindsock(_ wind: Wind) {
@@ -166,6 +175,7 @@ final class RangeScene {
         lightHolder.addChild(fill)
         root.addChild(staticHolder)
         root.addChild(courseHolder)
+        root.addChild(props.root)
         root.addChild(ribbonHolder)
         root.addChild(craftHolder)
         root.addChild(indicators.course)
@@ -296,6 +306,8 @@ final class RangeScene {
             courseHolder.addChild(beacon)
             gateBeacons.append(beacon)
         }
+        await props.build(course)
+        env?.illuminate(props.root)
         if let fy = course.finishY {
             let finish = ModelEntity(mesh: .generateBox(size: [180, 0.6, 0.6]), materials: [PartMeshFactory.unlit(0xF2F2F0, alpha: 0.6)])
             finish.position = rk(Vec3(0, fy, course.goal.z))
@@ -317,6 +329,14 @@ final class RangeScene {
         plume.orientation = simd_quatf(angle: .pi, axis: [1, 0, 0])
         plume.position = [0, -com, 0]
         plume.isEnabled = false
+        // Plume light, colour by propellant (specs/09): solid orange, kerolox yellow-white, electric none.
+        let solid = craft.expandedParts.contains { $0.def.engine?.solid == true }
+        var light = PointLightComponent(color: solid ? UIColor(red: 1, green: 0.55, blue: 0.2, alpha: 1)
+                                                    : UIColor(red: 1, green: 0.9, blue: 0.7, alpha: 1),
+                                        intensity: 60_000, attenuationRadius: 40)
+        if craft.expandedParts.contains(where: { $0.def.realityHDId == "engine-prop" }) { light.intensity = 0 }
+        let lamp = Entity(); lamp.components.set(light); lamp.position = [0, -3, 0]
+        plume.addChild(lamp)
         craftHolder.addChild(plume)
         self.plume = plume
         let canopy: (Float, UInt32) -> ModelEntity = { r, c in
@@ -367,7 +387,27 @@ final class RangeScene {
         craftHolder.position = rk(f.position) + [0, com, 0]
         let nose = Vec3(cos(f.pitch) * sin(f.yaw), cos(f.pitch) * cos(f.yaw), sin(f.pitch))
         let dir = simd_normalize(rk(nose))
-        craftHolder.orientation = simd_quatf(from: [0, 1, 0], to: dir)
+        let sim = f.sim
+        if let sim, sim.isAircraft {
+            // Aircraft: stack axis along the nose, wings level (local x right, local z up), then bank about the nose.
+            let right = simd_normalize(simd_cross(dir, [0, 1, 0]))
+            let up = simd_cross(right, dir)
+            let base = simd_quatf(simd_float3x3(columns: (right, dir, up)))
+            craftHolder.orientation = simd_quatf(angle: Float(sim.roll), axis: dir) * base
+        } else {
+            craftHolder.orientation = simd_quatf(from: [0, 1, 0], to: dir)
+        }
+        props.update(time: sim?.time ?? 0)
+        audio.update(throttle: f.throttle, dynamicPressure: sim?.dynamicPressure ?? 0, propeller: sim?.partIds.contains("engine-prop") ?? false,
+                     chase: view == .chase, flying: f.phase == .flying)
+        // Comfort vignette: view direction change rate in chase view (specs/03: from 30 deg/s, full at 90 deg/s).
+        if view == .chase, let last = lastViewDir, dt > 0 {
+            let rate = acos(min(1, max(-1, simd_dot(last, dir)))) / Float(dt) * 180 / .pi
+            vignette.update(rateDegPerSec: rate, dt: Float(dt))
+        } else {
+            vignette.update(rateDegPerSec: 0, dt: Float(dt))
+        }
+        lastViewDir = dir
         if let plume {
             plume.isEnabled = f.throttle > 0 && f.phase != .finished
             plume.scale = [1, Float(0.4 + f.throttle), 1]

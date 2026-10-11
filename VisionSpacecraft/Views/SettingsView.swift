@@ -20,6 +20,18 @@ struct SettingsView: View {
                         LabTabs(items: SkyStyle.allCases, selection: Bindable(model).skyStyle, title: { $0.title })
                     }
                     .labCard(padding: 16)
+                    LabCaption("Comfort and sound").padding(.top, 6)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Toggle("Comfort vignette in chase view", isOn: Binding(get: { ComfortVignette.enabled }, set: { ComfortVignette.enabled = $0 }))
+                            .font(Lab.soft(15)).tint(Brand.telemetry)
+                        Text("Darkens the edge of view while the chase camera turns faster than 30 deg/s.")
+                            .font(Lab.soft(12)).foregroundStyle(Lab.muted)
+                        Toggle("Flight sound", isOn: Binding(get: { FlightAudio.enabled }, set: { FlightAudio.enabled = $0 }))
+                            .font(Lab.soft(15)).tint(Brand.telemetry)
+                        Text("Engine, propeller and wind sound, and launch, pass and fail cues.")
+                            .font(Lab.soft(12)).foregroundStyle(Lab.muted)
+                    }
+                    .labCard(padding: 16)
                     LabCaption("Walkthroughs").padding(.top, 6)
                     VStack(alignment: .leading, spacing: 8) {
                         Toggle("Guided walkthroughs", isOn: $w.enabled).font(Lab.soft(15)).tint(Brand.telemetry)
