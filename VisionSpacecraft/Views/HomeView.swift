@@ -36,6 +36,7 @@ struct HomeView: View {
         Task {
             let l = model.nextLesson
             model.select(lesson: l)
+            model.lessonStage = .concept
             model.openLesson = l
             model.learnActive = true
             model.flightView = .ground

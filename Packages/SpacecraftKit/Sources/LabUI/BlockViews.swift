@@ -104,6 +104,9 @@ struct KnobField: View {
     @Binding var value: Double
     var body: some View {
         HStack(spacing: 3) {
+            Button { value = max(knob.min, value - knob.step) } label: { Image(systemName: "minus").font(.system(size: 11, weight: .bold)) }
+                .buttonStyle(.plain).foregroundStyle(Color(red: 0.11, green: 0.14, blue: 0.33)).frame(width: 22, height: 22).contentShape(Rectangle())
+                .accessibilityLabel("Decrease \(knob.label)")
             TextField("", value: Binding(get: { value }, set: { value = min(max($0, knob.min), knob.max) }), format: .number.precision(.fractionLength(0...2)))
                 .multilineTextAlignment(.center)
                 #if os(visionOS)
@@ -113,6 +116,9 @@ struct KnobField: View {
                 .foregroundStyle(Color(red: 0.11, green: 0.14, blue: 0.33))
                 .frame(width: 56)
                 .textFieldStyle(.plain)
+            Button { value = min(knob.max, value + knob.step) } label: { Image(systemName: "plus").font(.system(size: 11, weight: .bold)) }
+                .buttonStyle(.plain).foregroundStyle(Color(red: 0.11, green: 0.14, blue: 0.33)).frame(width: 22, height: 22).contentShape(Rectangle())
+                .accessibilityLabel("Increase \(knob.label)")
         }
         .padding(.horizontal, 9).padding(.vertical, 2)
         .background(Capsule().fill(.white))

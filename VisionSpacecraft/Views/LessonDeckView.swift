@@ -40,7 +40,7 @@ struct LessonDeckView: View {
         .animation(.spring(duration: 0.3), value: picking)
         .onAppear { reset() }
         .onChange(of: model.lesson?.id) { reset() }
-        .onChange(of: stage) { old, new in if new == .implement && old == .pseudocode { openCode() } }
+        .onChange(of: stage) { old, new in if new == .implement && old == .pseudocode && lesson.blockProgram == nil { openCode() } }
         .onChange(of: model.flight.phase) { _, p in
             if p == .finished, stage == .run, model.lastReport != nil { model.lessonStage = .analyze }
         }
@@ -69,6 +69,7 @@ struct LessonDeckView: View {
             ForEach(Lesson.all) { l in
                 Button {
                     model.select(lesson: l)
+                    model.lessonStage = .concept
                     model.openLesson = l
                     picking = false
                 } label: {
@@ -122,6 +123,10 @@ struct LessonDeckView: View {
         let lines = lesson.narration
         let i = min(line, max(0, lines.count - 1))
         return VStack(alignment: .leading, spacing: 12) {
+            if i == 0 {
+                Text("YOUR JOB · \(goalText)").font(Brand.label(11)).tracking(1.5).foregroundStyle(Brand.ignition)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Text(lesson.subtitle).font(Lab.soft(14)).foregroundStyle(Lab.muted)
             Text(lines.isEmpty ? "" : lines[i]).font(Lab.soft(21))
                 .frame(maxWidth: .infinity, minHeight: 110, alignment: .topLeading)
@@ -137,18 +142,8 @@ struct LessonDeckView: View {
     }
 
     @ViewBuilder private var pseudocode: some View {
-        if let p = lesson.blockProgram {
-            let ws = model.workspace(for: lesson)
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Arrange the blocks in the order the rocket runs them. One does not belong.").foregroundStyle(Lab.muted)
-                BlockComposer(program: p,
-                              order: Binding(get: { ws.order }, set: { ws.order = $0; checkResult = nil }),
-                              values: Binding(get: { ws.values }, set: { ws.values = $0 }))
-                    .frame(height: 300)
-                if checkResult == false {
-                    Text("Order is off. Remove a block with its x, or drag to reorder.").font(Lab.soft(14)).foregroundStyle(Brand.ignition)
-                }
-            }
+        if lesson.blockProgram != nil {
+            implement
         } else {
             textPseudocode
         }
@@ -180,14 +175,61 @@ struct LessonDeckView: View {
         }
     }
 
-    private var implement: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Open the code window and tune your blocks. The path above re-predicts on every change.")
-            Text("Goal: \(goalText)").font(Lab.soft(14)).foregroundStyle(Lab.muted)
-            prediction
-            Button("Fill reference code", systemImage: "wand.and.stars") { model.source = lesson.referenceCode }
-                .buttonStyle(LabSecondaryButtonStyle())
+    /// Guided build: one block per step, picked from the palette by tap, numbers tuned with − / +.
+    @ViewBuilder private var implement: some View {
+        if let p = lesson.blockProgram {
+            let ws = model.workspace(for: lesson)
+            let next = p.solution.first { !ws.order.contains($0) }
+            let done = p.solution.count - (next == nil ? 0 : p.solution.filter { !ws.order.contains($0) }.count)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    Text("STEP \(min(done + 1, p.solution.count)) OF \(p.solution.count)").font(Brand.label(11)).tracking(2).foregroundStyle(Brand.telemetry)
+                    Spacer()
+                    ForEach(p.solution.indices, id: \.self) { i in
+                        Capsule().fill(i < done ? Brand.telemetry : Lab.faint.opacity(0.4)).frame(width: i == done ? 18 : 7, height: 7)
+                    }
+                }
+                if let n = next.flatMap(p.spec) {
+                    Text(n.summary).font(Lab.soft(18)).foregroundStyle(Brand.ink).fixedSize(horizontal: false, vertical: true)
+                    Text("Tap the block that does this. Remove a wrong one with ×.").font(Lab.soft(13)).foregroundStyle(Lab.muted)
+                } else {
+                    Text("Program written. Tune the numbers with − and +, then take it to the pad.").font(Lab.soft(18)).foregroundStyle(Brand.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Goal: \(goalText)").font(Lab.soft(13)).foregroundStyle(Lab.muted)
+                }
+                BlockComposer(program: p, order: Binding(get: { ws.order }, set: { ws.order = $0; checkResult = nil; if $0 == p.solution { check() } }),
+                              values: Binding(get: { ws.values }, set: { ws.values = $0 }),
+                              errorBlockID: ws.errorBlock(line: model.codeProblem?.line))
+                    .frame(height: 340)
+                prediction
+                if wrongTail(ws.order, p) {
+                    Text("That block runs later or does not belong. Tap × to remove it.").font(Lab.soft(13)).foregroundStyle(Brand.ignition)
+                }
+                if let n = next {
+                    Button("Show me", systemImage: "lightbulb") { hint(n, ws, p) }.buttonStyle(LabGhostButton())
+                }
+            }
+            .onAppear { ws.publish() }
+        } else {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Write update(dt) in the code window. Each TODO is one line. The dotted path re-predicts on every edit.")
+                Text("Goal: \(goalText)").font(Lab.soft(14)).foregroundStyle(Lab.muted)
+                prediction
+            }
         }
+    }
+
+    /// Placed blocks that are not a prefix of the solution: the player went off track.
+    private func wrongTail(_ order: [String], _ p: BlockProgram) -> Bool {
+        !order.isEmpty && !p.solution.starts(with: order)
+    }
+
+    /// Drop wrong blocks, then place the next correct one.
+    private func hint(_ id: String, _ ws: CodeWorkspaceModel, _ p: BlockProgram) {
+        var o = ws.order.filter { p.solution.contains($0) }
+        o = p.solution.filter { o.contains($0) }
+        o.append(id)
+        ws.order = p.solution.filter { o.contains($0) }
     }
 
     private var run: some View {
@@ -302,7 +344,7 @@ struct LessonDeckView: View {
             if let g = model.grade(lesson) {
                 model.completed[lesson.id] = max(model.completed[lesson.id] ?? 0, g.stars)
                 if let n = Lesson.all.first(where: { $0.id > lesson.id }) {
-                    model.select(lesson: n); model.openLesson = n
+                    model.select(lesson: n); model.lessonStage = .concept; model.openLesson = n
                 } else { Task { await exit() } }
             } else { model.lessonStage = .run }
         }
