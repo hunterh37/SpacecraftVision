@@ -519,7 +519,7 @@ used because the craft turns earlier and flies a longer path.
 | P8 | `pylon` | (130, 1,450) | radius 1.5, height 150 |
 
 Pass: finish gate passed, no collision, no corridor exit. Par: energy 600 Wh (fuel component uses
-energy for electric craft), clearance 25 m.
+energy for electric craft), clearance 8 m (measured from the 4.5 m half-span; M4 tuning).
 
 ### Aircraft helper block
 
@@ -1342,3 +1342,30 @@ Gains and thresholds in the reference solutions are starting values. Milestone M
 against its course in `FlightSim`; a reference must pass with 3 stars. When it does not, the gain in
 the reference changes; course geometry and part constants change only through an edit to this file
 and `14-parts-catalog.md`.
+
+## M4 tuning record
+
+Run against FlightSim with sensor noise on. Reference code as shipped lives in
+`Curriculum/LessonCode.swift` and `LessonCode2.swift`; the code blocks above are the original drafts.
+
+| Lesson | Course, craft | Result | Fuel or energy | Min clearance |
+|---|---|---|---|---|
+| L2 | C2, R-gates | pass | 382 kg | 9.4 m |
+| L3 | C2B, R-walls | pass | 486 kg | 1.2 m |
+| L4 | C4, A-field | pass | 151 Wh | 14.6 m |
+| L5 | C4, A-field | pass | 134 Wh | 8.3 m |
+
+Changes from the drafts:
+- Rocket helpers (L2, L3): square-root braking altitude hold with engine cut below a 0.3 demand;
+  `steer()` turns the velocity error into a heading error and tilt and leans back past vertical
+  instead of turning the heading round (the simulator allows rocket pitch up to 135 deg).
+- L3: lidar angles are taken from the flight path; the front fan is centred on the goal direction;
+  avoiding slides sideways at SLIDE_SPEED 5 m/s; SAFE_DIST 35 m; CRUISE_SPEED 8 m/s. Par: fuel 490 kg,
+  clearance 1 m.
+- Aircraft helper: CRUISE_SPEED 25, MAX_TURN 0.39 (45 deg bank at 25 m/s; the simulator limits the
+  heading rate to g / v). `hold_altitude` adds a 0.07 rad trim and gain 0.02.
+- L4: HIT_DIST 110, FOLLOW_DIST 80; when the boundary ends the craft bends back toward the goal;
+  a final mode aims at the finish gate inside 350 m.
+- L5: K_ATT 2, K_REP 1.5e6, R0 120; only hits within 90 deg of the nose repel; four fine rays at
+  ±5 and ±15 deg join the scan; at the saddle it turns 90 deg to the open side; attraction only
+  inside 300 m of the gate.

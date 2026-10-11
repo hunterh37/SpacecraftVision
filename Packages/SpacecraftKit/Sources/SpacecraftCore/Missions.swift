@@ -198,7 +198,7 @@ public struct Mission: Codable, Sendable, Hashable, Identifiable {
 
     public static let m2b = Mission(id: "M2B", title: "Gates and walls", lesson: 3, courseId: "C2B", payloadMass: 20, massCap: 1_600,
                                     partCap: 16, budget: 30_000, energyCap: 2_500, fixedFuelLoad: nil, allowedParts: m2bParts,
-                                    goal: .gates, parFuel: 220, parClearance: 5)
+                                    goal: .gates, parFuel: 490, parClearance: 1)
     public static let m3 = Mission(id: "M3", title: "Drift", lesson: nil, courseId: "C3", payloadMass: 20, massCap: 1_600,
                                    partCap: 16, budget: 26_000, energyCap: 2_500, fixedFuelLoad: nil,
                                    allowedParts: m1Parts + ["fuel-tank-m", "decoupler"], goal: .gates, parFuel: 380, parClearance: 6)
