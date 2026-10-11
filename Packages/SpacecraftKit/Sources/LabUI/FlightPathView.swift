@@ -203,6 +203,13 @@ public struct FlightPathView: View {
                 ctx.fill(q, with: .color(Brand.telemetry.opacity(0.05)))
                 ctx.stroke(q, with: .color(Brand.telemetry.opacity(0.3)), style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
             }
+        case let .path(points, w, _, _, _):
+            if proj.mode == .top, points.count > 1 {
+                var q = Path(); q.move(to: P(points[0]))
+                for pt in points.dropFirst() { q.addLine(to: P(pt)) }
+                ctx.stroke(q, with: .color(Brand.telemetry.opacity(0.12)), style: StrokeStyle(lineWidth: max(1, 2 * w * sc.x), lineCap: .round, lineJoin: .round))
+                ctx.stroke(q, with: .color(Brand.telemetry.opacity(0.35)), style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+            }
         }
         if let z = course.landingZone {
             if proj.mode == .side {

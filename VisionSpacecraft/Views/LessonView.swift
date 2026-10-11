@@ -197,6 +197,7 @@ struct LessonView: View {
         case let .hop(lo, hi, rms):
             "apogee \(Int(lo)) to \(Int(hi)) m, touchdown in the zone at 6 m/s or less" + (rms.map { ", pitch error RMS \(Int($0)) deg or less" } ?? "")
         case .gates: "pass the gates in order, then cross the finish"
+        case .climb, .capstone: "climb inside the corridor, then cross the finish"
         }
     }
 }

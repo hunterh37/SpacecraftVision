@@ -241,6 +241,7 @@ private struct ModeView: View {
         switch m.goal {
         case let .hop(lo, hi, _): goal = "Apogee \(Int(lo))–\(Int(hi)) m, land in zone"
         case .gates: goal = "\(m.course.gates.count) ring gates in order"
+        case .climb, .capstone: goal = "Climb the corridor to the finish"
         }
         return "\(goal) · \(Int(m.massCap)) kg · \(m.partCap) parts · \(m.budget) cr"
     }

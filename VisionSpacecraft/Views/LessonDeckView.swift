@@ -321,6 +321,22 @@ struct LessonDeckView: View {
         switch lesson.mission.goal {
         case let .hop(lo, hi, _): "apogee \(Int(lo))–\(Int(hi)) m, land in the zone ≤ 6 m/s"
         case .gates: "pass the gates in order, then the finish"
+        case .climb, .capstone: "climb inside the corridor to the finish"
+        }
+    }
+}
+
+struct FlowBlocks: View {
+    let items: [String]
+    let tap: (String) -> Void
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(items, id: \.self) { b in
+                Button { tap(b) } label: {
+                    Text(b).font(.system(.callout, design: .monospaced)).padding(.vertical, 4)
+                }
+                .buttonStyle(.bordered)
+            }
         }
     }
 }

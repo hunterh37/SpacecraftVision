@@ -43,6 +43,8 @@ enum TaskGuideBridge {
             }
         case .gates:
             goal = "Fly through \(mission.course.gates.count) ring gates in order and cross the finish."
+        case .climb, .capstone:
+            goal = "Climb inside the corridor and cross the finish."
         }
         var lines = [
             goal,
