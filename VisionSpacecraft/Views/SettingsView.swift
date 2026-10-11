@@ -10,6 +10,11 @@ struct SettingsView: View {
         @Bindable var w = model.walkthrough
         TourActionsReader { a in
             Form {
+                Section("Launch range sky") {
+                    Picker("Sky", selection: Bindable(model).skyStyle) {
+                        ForEach(SkyStyle.allCases) { style in Text(style.title).tag(style) }
+                    }
+                }
                 Section {
                     Toggle("Guided walkthroughs", isOn: $w.enabled)
                 } footer: {

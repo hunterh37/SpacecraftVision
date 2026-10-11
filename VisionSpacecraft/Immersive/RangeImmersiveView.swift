@@ -23,6 +23,8 @@ struct RangeImmersiveView: View {
                 content.add(env.root)
                 scene.env = env
             }
+            content.add(scene.skyHolder)
+            scene.updateSky(style: model.skyStyle, timeOfDay: model.mission.course.timeOfDay)
             content.add(scene.root)
             if let hud = attachments.entity(for: "hud") {
                 scene.hud = hud
@@ -68,6 +70,9 @@ struct RangeImmersiveView: View {
         }
         .task(id: model.craft) { await scene.rebuildCraft(model.craft) }
         .task(id: model.mission.id) { await scene.buildStatic(course: model.mission.course) }
+        .task(id: SkyKey(style: model.skyStyle, timeOfDay: model.mission.course.timeOfDay)) {
+            scene.updateSky(style: model.skyStyle, timeOfDay: model.mission.course.timeOfDay)
+        }
         .task(id: RibbonKey(n: model.preview?.samples.count ?? 0, t: model.preview?.result.duration ?? 0, view: model.flightView)) {
             scene.rebuildRibbon(model.preview, view: model.flightView)
             scene.applyView(model.flightView, course: model.mission.course)
@@ -79,11 +84,13 @@ struct RangeImmersiveView: View {
     }
 
     struct RibbonKey: Hashable { var n: Int; var t: Double; var view: FlightView }
+    struct SkyKey: Hashable { var style: SkyStyle; var timeOfDay: TimeOfDay }
 }
 
 @MainActor
 final class RangeScene {
     let root = Entity()           // world root, moved/scaled per view
+    let skyHolder = Entity()      // stays around the viewer when the range shifts for chase/tabletop
     let staticHolder = Entity()
     let courseHolder = Entity()
     let craftHolder = Entity()    // positioned by the sim
@@ -109,6 +116,11 @@ final class RangeScene {
         root.addChild(ribbonHolder)
         root.addChild(craftHolder)
         root.addChild(indicators.course)
+    }
+
+    func updateSky(style: SkyStyle, timeOfDay: TimeOfDay) {
+        skyHolder.children.removeAll()
+        if let sky = SkyBackdrop.make(style, timeOfDay: timeOfDay, radius: 3000) { skyHolder.addChild(sky) }
     }
 
     // MARK: Walkthrough indicators

@@ -34,6 +34,9 @@ final class AppModel {
     var followToSpace = true
     var followedLaunch = -1
     var flightView: FlightView = .ground
+    var skyStyle: SkyStyle = SkyStyle(rawValue: UserDefaults.standard.string(forKey: "skyStyle") ?? "") ?? .mission {
+        didSet { UserDefaults.standard.set(skyStyle.rawValue, forKey: "skyStyle") }
+    }
 
     // Code
     var sources: [String: String] = [:]          // missionId -> source
