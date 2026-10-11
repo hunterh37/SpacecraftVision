@@ -90,6 +90,12 @@ private struct DebugLaunch: ViewModifier {
     func body(content: Content) -> some View {
         content.task {
             #if DEBUG
+            // -debugRange 1 opens the launch scene directly for simulator visual checks.
+            if UserDefaults.standard.string(forKey: "debugRange") == "1" {
+                try? await Task.sleep(for: .seconds(2))
+                await SpaceSwitcher(model: model, open: openSpace, dismiss: dismissSpace).show(.range)
+                return
+            }
             // -debugSpace N [-debugCode ref|starter] [-debugLaunch 1]: open the space scene on lesson N, optionally flying it at 8x.
             if let raw = UserDefaults.standard.string(forKey: "debugSpace"), let n = Int(raw), Lesson.all.indices.contains(n) {
                 let l = Lesson.all[n]

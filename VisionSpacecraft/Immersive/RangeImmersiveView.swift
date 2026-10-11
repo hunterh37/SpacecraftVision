@@ -115,6 +115,7 @@ final class RangeScene {
     private var builtCourse: String?
 
     init() {
+        skyHolder.position.y = -1.6
         lightHolder.addChild(sun)
         lightHolder.addChild(fill)
         root.addChild(staticHolder)
@@ -292,7 +293,7 @@ final class RangeScene {
         switch view {
         case .ground:
             root.scale = .one
-            root.position = [0, 0, -60]
+            root.position = [0, -1.6, -60]
             staticHolder.isEnabled = true
             hud?.position = [0, 1.15, -1.1]
         case .chase:
