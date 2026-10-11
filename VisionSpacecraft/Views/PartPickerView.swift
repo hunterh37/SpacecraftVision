@@ -17,7 +17,7 @@ struct PartPickerView: View {
             VStack(alignment: .leading, spacing: 14) {
                 LabHeader(kicker: "\(model.mission.id) · Hangar", title: "Parts", tint: Brand.trajectory)
                 TipBanner(tip: .hangar)
-                budgetMeter.labCard()
+                budgetMeter.labCard(padding: 16)
                 LabCaption("Rack: \(model.mission.id) parts", tint: Brand.trajectory).padding(.top, 4)
                 ForEach(model.mission.allowedParts, id: \.self) { id in
                     if let def = PartCatalog.part(id) {
@@ -109,7 +109,7 @@ struct PartPickerView: View {
                         Button("Clear craft", role: .destructive) { model.clearCraft() }.buttonStyle(LabGhostButton(tint: Lab.danger))
                     }
                 }
-                .labCard()
+                .labCard(padding: 16)
                 .padding(.top, 4)
             }
             .padding(24)

@@ -28,7 +28,8 @@ struct FlightHUDView: View {
         }
         .padding(22)
         .frame(width: 520)
-        .labPanel(corner: 30, tint: Brand.ignition, variant: .ember, aurora: 0.28)
+        .background(Brand.space.opacity(0.55), in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .glassBackgroundEffect(in: RoundedRectangle(cornerRadius: 30, style: .continuous))
         .tint(Brand.ignition)
         .animation(.spring(duration: 0.35), value: f.phase)
         .animation(.spring(duration: 0.35), value: details)
@@ -268,18 +269,21 @@ struct ResultCard: View {
     let report: FlightReport
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        let failed = report.result.failure != nil
+        let tint = failed ? Brand.ignition : Brand.telemetry
+        VStack(alignment: .leading, spacing: 6) {
             if let f = report.result.failure {
-                LabCaption(f.title, tint: Brand.ignition)
-                Text(f.body).font(Lab.soft(15)).foregroundStyle(Lab.ink)
-                Text(String(format: "AT %.1f S", f.time)).font(Brand.label(11)).tracking(2).foregroundStyle(Lab.muted)
+                Label(f.title.uppercased(), systemImage: "xmark.circle.fill").font(Brand.label(13)).tracking(1.5).foregroundStyle(tint)
+                Text(f.body).font(.system(size: 16, weight: .medium)).foregroundStyle(Brand.ink)
+                Text(String(format: "At %.1f s", f.time)).font(Brand.label(12)).foregroundStyle(Brand.dim)
             } else {
-                LabCaption("Mission passed", tint: Brand.telemetry)
+                Label("MISSION PASSED", systemImage: "checkmark.circle.fill").font(Brand.label(13)).tracking(1.5).foregroundStyle(tint)
                 Text("Score \(report.result.score). Apogee \(Int(report.result.apogee)) m, fuel used \(Int(report.result.fuelUsed)) kg.")
-                    .font(Lab.soft(15)).foregroundStyle(Lab.ink)
+                    .font(.system(size: 16, weight: .medium)).foregroundStyle(Brand.ink)
             }
         }
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .labCard(tint: report.result.failure == nil ? Brand.telemetry : Brand.ignition, corner: 16, padding: 14)
+        .labCard(corner: 22, tint: tint, variant: failed ? .ember : .tide, aurora: 0.2)
     }
 }

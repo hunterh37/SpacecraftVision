@@ -62,7 +62,8 @@ struct HomeView: View {
             }
             .padding(48)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(BrandBackground())
+            .labWindow()
+            .toolbarVisibility(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItemGroup(placement: .bottomOrnament) {
                     Button("Settings", systemImage: "gearshape") { model.homePath.append(SettingsRoute.main) }
@@ -90,7 +91,7 @@ struct HomeView: View {
 
     func progress(_ m: GameMode) -> String {
         switch m {
-        case .learn: "\(model.completed.count)/\(Lesson.all.count) LESSONS"
+        case .learn: "\(min(model.completed.count, 1))/1 LESSON · MORE SOON"
         case .missions: "\(Mission.all.count) MISSIONS"
         case .workshop: "\(model.craft.stack.count) PARTS ON PAD"
         }
@@ -127,13 +128,14 @@ private struct ModeView: View {
     @Environment(\.openImmersiveSpace) private var openSpace
     @Environment(\.dismissImmersiveSpace) private var dismissSpace
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismiss) private var dismiss
 
     var switcher: SpaceSwitcher { SpaceSwitcher(model: model, open: openSpace, dismiss: dismissSpace) }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                Text(mode.line).font(.system(size: 18, weight: .medium)).foregroundStyle(Brand.dim).padding(.bottom, 8)
+            VStack(alignment: .leading, spacing: 16) {
+                LabHeader(mode.title, caption: mode.line, tint: mode.tint, onBack: { dismiss() }).padding(.bottom, 6)
                 switch mode {
                 case .learn: lessons
                 case .missions: missions
@@ -142,14 +144,12 @@ private struct ModeView: View {
             }
             .padding(40)
         }
-        .background(BrandBackground())
-        .navigationTitle(mode.title)
-        .onAppear { model.walkthrough.startIfNeeded(TourID(rawValue: mode.rawValue)!) }
+        .labWindow(tint: mode.tint)
+        .toolbarVisibility(.hidden, for: .navigationBar)
         .toolbar {
             ToolbarItemGroup(placement: .bottomOrnament) {
                 Button("Code", systemImage: "chevron.left.forwardslash.chevron.right") { openWindow(id: WindowID.code) }
                 Button("Analysis", systemImage: "chart.xyaxis.line") { openWindow(id: WindowID.analysis) }
-                Button("Tour", systemImage: "sparkles") { model.walkthrough.replay(TourID(rawValue: mode.rawValue)!) }
                 if model.openSpace != nil {
                     Button("Exit space", systemImage: "xmark") { Task { await switcher.close() } }
                 }
@@ -158,23 +158,33 @@ private struct ModeView: View {
     }
 
     private var lessons: some View {
-        ForEach(Lesson.all) { l in
-            NavigationLink(value: l) {
-                Row(index: String(format: "%02d", l.id), title: l.title, detail: l.subtitle, tint: mode.tint) {
-                    if let s = model.completed[l.id] {
-                        Text(String(repeating: "★", count: s) + String(repeating: "☆", count: 3 - s))
-                            .foregroundStyle(Brand.ignition)
+        VStack(spacing: 14) {
+            if let l = Lesson.all.first {
+                NavigationLink(value: l) {
+                    LabRow(index: "01", title: l.title, detail: l.subtitle, tint: mode.tint) {
+                        if let st = model.completed[l.id] {
+                            Text(String(repeating: "★", count: st) + String(repeating: "☆", count: 3 - st)).foregroundStyle(Brand.ignition)
+                        } else {
+                            Text("START").font(Brand.label(12)).tracking(2).foregroundStyle(mode.tint)
+                        }
                     }
                 }
+                .buttonStyle(.plain)
+                .simultaneousGesture(TapGesture().onEnded { model.select(lesson: l) })
             }
-            .buttonStyle(.plain)
-            .simultaneousGesture(TapGesture().onEnded { model.select(lesson: l) })
+            ForEach(Array(ComingSoon.lessons.enumerated()), id: \.offset) { i, c in
+                LabRow(index: String(format: "%02d", i + 2), title: c.title, detail: c.detail, tint: Brand.dim) {
+                    Label("SOON", systemImage: "lock.fill").font(Brand.label(11)).tracking(2).foregroundStyle(Brand.dim)
+                }
+                .opacity(0.55)
+                .allowsHitTesting(false)
+            }
         }
     }
 
     private var missions: some View {
         ForEach(Mission.all) { m in
-            Row(index: m.id, title: m.title, detail: summary(m), tint: mode.tint) {
+            LabRow(index: m.id, title: m.title, detail: summary(m), tint: mode.tint, selected: model.mission.id == m.id) {
                 HStack {
                     Button("Code") {
                         model.mission = m
@@ -190,20 +200,19 @@ private struct ModeView: View {
                 }
             }
             .onTapGesture { model.mission = m; model.missionPicked = true }
-            .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(model.mission.id == m.id ? mode.tint : .clear, lineWidth: 2))
         }
     }
 
     private var workshop: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Row(index: model.mission.id, title: "Hangar", detail: "Build for \(model.mission.title). Pick parts, check mass and thrust.", tint: mode.tint) {
+            LabRow(index: model.mission.id, title: "Hangar", detail: "Build for \(model.mission.title). Pick parts, check mass and thrust.", tint: mode.tint) {
                 Button("Enter") {
                     Task { await switcher.show(.workshop) }
                     openWindow(id: WindowID.parts)
                 }
                 .buttonStyle(BrandButtonStyle(tint: mode.tint))
             }
-            Row(
+            LabRow(
                 index: "W01–4",
                 title: "Guided Workshop",
                 detail: "Optional: mission, components, scale, and design checks. Free-build remains available.",
@@ -217,7 +226,7 @@ private struct ModeView: View {
                 .buttonStyle(BrandButtonStyle(tint: mode.tint))
                 .accessibilityLabel("Start Guided Workshop")
             }
-            Row(index: "▶", title: "Range", detail: "Fly the current craft on the launch range.", tint: mode.tint) {
+            LabRow(index: "▶", title: "Range", detail: "Fly the current craft on the launch range.", tint: mode.tint) {
                 Button("Launch") { Task { await switcher.show(.range) } }
                     .buttonStyle(BrandButtonStyle(tint: mode.tint))
             }
@@ -237,25 +246,14 @@ private struct ModeView: View {
     }
 }
 
-private struct Row<Trailing: View>: View {
-    let index: String
+/// Lessons shown as locked so the course reads as a whole; none of them is built yet.
+private struct ComingSoon {
     let title: String
     let detail: String
-    let tint: Color
-    @ViewBuilder var trailing: Trailing
-
-    var body: some View {
-        HStack(spacing: 20) {
-            Text(index).font(Brand.label(16)).foregroundStyle(tint).frame(width: 52, alignment: .leading)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(.system(size: 20, weight: .bold, design: .rounded)).foregroundStyle(Brand.ink)
-                Text(detail).font(.system(size: 14)).foregroundStyle(Brand.dim)
-            }
-            Spacer()
-            trailing
-        }
-        .labCard(tint: tint, corner: 22, padding: 20)
-        .contentShape(.hoverEffect, RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .hoverEffect(.highlight)
-    }
+    static let lessons: [ComingSoon] = [
+        ComingSoon(title: "Reactive avoidance", detail: "Sense with rays and steer around what is in the way"),
+        ComingSoon(title: "Potential fields", detail: "The goal pulls, obstacles push, the craft follows the force"),
+        ComingSoon(title: "Vector field histogram", detail: "Pick the widest safe gap from a polar scan"),
+        ComingSoon(title: "Path planning", detail: "Search a grid of free space and replan as it changes"),
+    ]
 }

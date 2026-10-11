@@ -19,14 +19,14 @@ struct SettingsView: View {
                         Spacer()
                         LabTabs(items: SkyStyle.allCases, selection: Bindable(model).skyStyle, title: { $0.title })
                     }
-                    .labCard()
+                    .labCard(padding: 16)
                     LabCaption("Walkthroughs").padding(.top, 6)
                     VStack(alignment: .leading, spacing: 8) {
                         Toggle("Guided walkthroughs", isOn: $w.enabled).font(Lab.soft(15)).tint(Brand.telemetry)
                         Text("Shows a step-by-step tour the first time each mode and the launch range open. Each step has Show me, which performs the action, and Skip tour.")
                             .font(Lab.soft(12)).foregroundStyle(Lab.muted)
                     }
-                    .labCard()
+                    .labCard(padding: 16)
                     LabCaption("Replay a tour", tint: Brand.trajectory).padding(.top, 6)
                     VStack(spacing: 10) {
                         ForEach(TourID.allCases) { t in
@@ -51,7 +51,7 @@ struct SettingsView: View {
                             .buttonStyle(LabGhostButton(tint: Brand.ignition))
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .labCard()
+                    .labCard(padding: 16)
                     LabCaption("Demo", tint: Brand.ignition).padding(.top, 6)
                     VStack(alignment: .leading, spacing: 8) {
                         Button {
@@ -62,7 +62,7 @@ struct SettingsView: View {
                         Text("Plays every tour on its own: a lesson from concept to graded flight, a mission into the range, then the hangar. Take over stops it at any step.")
                             .font(Lab.soft(12)).foregroundStyle(Lab.muted)
                     }
-                    .labCard()
+                    .labCard(padding: 16)
                 }
                 .padding(32)
             }

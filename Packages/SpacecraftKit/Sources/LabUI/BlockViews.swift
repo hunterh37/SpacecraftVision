@@ -307,7 +307,7 @@ public struct BlockComposer: View {
     }
 }
 
-extension View {
+public extension View {
     /// visionOS hover feedback; a no-op elsewhere so the package also builds and tests on macOS.
     @ViewBuilder func lift() -> some View {
         #if os(visionOS)

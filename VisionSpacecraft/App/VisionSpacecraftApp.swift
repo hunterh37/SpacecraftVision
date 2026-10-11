@@ -21,24 +21,28 @@ struct VisionSpacecraftApp: App {
                 .environment(model)
                 .modifier(DebugLaunch(model: model))
         }
+        .windowStyle(.plain)
         .defaultSize(width: 900, height: 700)
 
         WindowGroup(id: WindowID.parts) {
             PartPickerView()
                 .environment(model)
         }
+        .windowStyle(.plain)
         .defaultSize(width: 520, height: 720)
 
         WindowGroup(id: WindowID.code) {
             CodeEditorView()
                 .environment(model)
         }
+        .windowStyle(.plain)
         .defaultSize(width: 1000, height: 760)
 
         WindowGroup(id: WindowID.analysis) {
             AnalysisView()
                 .environment(model)
         }
+        .windowStyle(.plain)
         .defaultSize(width: 900, height: 640)
 
         ImmersiveSpace(id: SpaceID.workshop.rawValue) {
@@ -113,6 +117,31 @@ private struct DebugLaunch: ViewModifier {
                 try? await Task.sleep(for: .seconds(2))
                 await SpaceSwitcher(model: model, open: openSpace, dismiss: dismissSpace).show(.space)
                 if UserDefaults.standard.string(forKey: "debugLaunch") == "1" { try? await Task.sleep(for: .seconds(2)); model.flight.timeScale = 8; model.launch() }
+                return
+            }
+            // -debugRoute learn | missions | workshop | lessonN-stage | analysis | parts | settings | code: jump to a screen for visual checks.
+            if let route = UserDefaults.standard.string(forKey: "debugRoute") {
+                let l1 = Lesson.all[min(1, Lesson.all.count - 1)]
+                model.select(lesson: l1)
+                model.source = l1.referenceCode
+                switch route {
+                case "learn", "missions", "workshop": model.showMode(GameMode(rawValue: route)!)
+                case "settings": model.homePath = NavigationPath(); model.homePath.append(SettingsRoute.main)
+                case "parts": openWindow(id: WindowID.parts)
+                case "code": openWindow(id: WindowID.code)
+                case "analysis":
+                    for _ in 0..<40 { if model.preview?.compileError == nil, model.preview != nil { break }; try? await Task.sleep(for: .milliseconds(250)) }
+                    model.lastReport = model.preview; model.reports = model.preview.map { [$0] } ?? []
+                    openWindow(id: WindowID.analysis)
+                default:
+                    if route.hasPrefix("lesson") {
+                        let parts = route.dropFirst(6).split(separator: "-")
+                        if let i = parts.first.flatMap({ Int($0) }), Lesson.all.indices.contains(i) {
+                            model.select(lesson: Lesson.all[i]); model.showMode(.learn); model.homePath.append(Lesson.all[i])
+                            if let st = parts.dropFirst().first, let stage = LessonStage.allCases.first(where: { String(describing: $0) == st }) { model.lessonStage = stage }
+                        }
+                    }
+                }
                 return
             }
             guard let raw = UserDefaults.standard.string(forKey: "debugLesson"), let n = Int(raw), Lesson.all.indices.contains(n) else { return }

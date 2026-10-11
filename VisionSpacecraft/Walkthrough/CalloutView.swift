@@ -104,9 +104,7 @@ struct TourCard: View {
         }
         .padding(22)
         .frame(width: width, alignment: .leading)
-        .background(Brand.space.opacity(0.72), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).strokeBorder(.white.opacity(0.35), lineWidth: 1))
-        .glassBackgroundEffect(in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .labPanel(corner: 26, tint: Brand.ignition, variant: .ember, aurora: 0.3)
         .animation(.easeOut(duration: 0.3), value: w.showMore)
     }
 }
@@ -123,7 +121,7 @@ struct TipBanner: View {
     @State private var more = false
 
     var body: some View {
-        if model.walkthrough.shouldShow(tip) {
+        if tip.afterLaunch, model.walkthrough.shouldShow(tip) {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Text(tip.title).font(Brand.label(11)).tracking(3).foregroundStyle(Brand.ignition)
@@ -138,8 +136,12 @@ struct TipBanner: View {
                 if more { Text(tip.more).font(.system(size: 13)).foregroundStyle(Brand.dim) }
             }
             .padding(14)
-            .background(Brand.space.opacity(0.6), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Brand.ignition.opacity(0.5), lineWidth: 1))
+            .labCard(corner: 18, tint: Brand.ignition, variant: .ember, aurora: 0.16)
         }
     }
+}
+
+extension TipID {
+    /// Guidance appears once the player has launched. Before that the workspace is left alone.
+    var afterLaunch: Bool { self == .failure || self == .blocked }
 }

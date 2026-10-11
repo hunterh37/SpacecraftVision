@@ -165,23 +165,37 @@ struct GrainLayer: View {
     }
 }
 
-public extension View {
-    /// A Brand card with extra depth: hull-to-space base, a warm ignition glow at the floor, a tinted glow at the top,
-    /// aurora streaks, grain, and a tinted hairline plus inner frame. Self-contained, so it reads over passthrough.
-    func labPanel(corner: CGFloat = 32, tint: Color = Brand.telemetry, variant: AuroraVariant = .dusk, aurora: Double = 0.4) -> some View {
-        background {
-            ZStack {
-                LinearGradient(colors: [Brand.hull, Color(red: 0.06, green: 0.08, blue: 0.14), Brand.space], startPoint: .top, endPoint: .bottom)
-                RadialGradient(colors: [Brand.ignition.opacity(0.26), .clear], center: .bottom, startRadius: 0, endRadius: 340)
-                RadialGradient(colors: [tint.opacity(0.20), .clear], center: .top, startRadius: 0, endRadius: 320)
-                AuroraLayer(variant: variant, strength: aurora)
-                GrainLayer()
-            }
-            .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
+/// The shared surface: hull-to-space base, a warm ignition glow at the floor, a tinted glow at the top, aurora streaks and grain.
+/// Used as a panel background, as a whole window's container background, and (lighter) behind rows and tiles.
+public struct LabSurface: View {
+    public var tint: Color
+    public var variant: AuroraVariant
+    public var aurora: Double
+    public init(tint: Color = Brand.telemetry, variant: AuroraVariant = .dusk, aurora: Double = 0.4) { self.tint = tint; self.variant = variant; self.aurora = aurora }
+    public var body: some View {
+        ZStack {
+            LinearGradient(colors: [Brand.hull, Color(red: 0.06, green: 0.08, blue: 0.14), Brand.space], startPoint: .top, endPoint: .bottom)
+            RadialGradient(colors: [Brand.ignition.opacity(0.26), .clear], center: .bottom, startRadius: 0, endRadius: 340)
+            RadialGradient(colors: [tint.opacity(0.20), .clear], center: .top, startRadius: 0, endRadius: 320)
+            AuroraLayer(variant: variant, strength: aurora)
+            GrainLayer()
         }
+    }
+}
+
+public extension View {
+    /// A Brand card with extra depth, clipped, with a tinted hairline and an inner frame. Self-contained, so it reads over passthrough.
+    func labPanel(corner: CGFloat = 32, tint: Color = Brand.telemetry, variant: AuroraVariant = .dusk, aurora: Double = 0.4) -> some View {
+        background { LabSurface(tint: tint, variant: variant, aurora: aurora).clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous)) }
         .overlay { RoundedRectangle(cornerRadius: corner, style: .continuous).strokeBorder(tint.opacity(0.38), lineWidth: 1) }
         .overlay { RoundedRectangle(cornerRadius: max(corner - 8, 4), style: .continuous).inset(by: 9).stroke(tint.opacity(0.12), lineWidth: 1).allowsHitTesting(false) }
         .shadow(color: tint.opacity(0.16), radius: 26)
+    }
+
+    /// A lighter card for rows and tiles inside a window or panel: same surface, quieter aurora, tinted hairline.
+    func labCard(corner: CGFloat = 22, tint: Color = Brand.telemetry, variant: AuroraVariant = .dusk, aurora: Double = 0.16) -> some View {
+        background { LabSurface(tint: tint, variant: variant, aurora: aurora).opacity(0.92).clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous)) }
+            .overlay { RoundedRectangle(cornerRadius: corner, style: .continuous).strokeBorder(tint.opacity(0.30), lineWidth: 1) }
     }
 }
 
@@ -205,7 +219,8 @@ public extension View {
     }
 
     /// Inset surface for rows and groups inside a labWindow: dark hull fill, tinted hairline.
-    func labCard(tint: Color = Lab.edge, corner: CGFloat = 20, padding: CGFloat = 16) -> some View {
+    /// Padded flat card. `padding:` is required so the call can never be confused with the aurora `labCard(corner:tint:variant:aurora:)`.
+    func labCard(tint: Color = Lab.edge, corner: CGFloat = 20, padding: CGFloat) -> some View {
         self.padding(padding)
             .background(Color(red: 0.02, green: 0.03, blue: 0.14).opacity(0.55), in: RoundedRectangle(cornerRadius: corner, style: .continuous))
             .overlay { RoundedRectangle(cornerRadius: corner, style: .continuous).strokeBorder(tint.opacity(0.25), lineWidth: 1) }
@@ -221,27 +236,6 @@ public struct LabCaption: View {
         HStack(spacing: 8) {
             Rectangle().fill(tint).frame(width: 22, height: 3).clipShape(Capsule())
             Text(text.uppercased()).font(Brand.label(11)).tracking(2).foregroundStyle(tint)
-        }
-    }
-}
-
-/// Window header: mono kicker over a display title, trailing controls.
-public struct LabHeader<Trailing: View>: View {
-    var kicker: String
-    var title: String
-    var tint: Color
-    @ViewBuilder var trailing: Trailing
-    public init(kicker: String, title: String, tint: Color = Brand.ignition, @ViewBuilder trailing: () -> Trailing = { EmptyView() }) {
-        self.kicker = kicker; self.title = title; self.tint = tint; self.trailing = trailing()
-    }
-    public var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(kicker.uppercased()).font(Brand.label(12)).tracking(3).foregroundStyle(tint)
-                Text(title.uppercased()).font(Lab.display(24)).foregroundStyle(Lab.ink).lineLimit(1).minimumScaleFactor(0.6)
-            }
-            Spacer(minLength: 8)
-            trailing
         }
     }
 }

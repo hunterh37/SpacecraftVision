@@ -43,3 +43,36 @@ public struct SeededRNG {
     }
 }
 
+
+/// The primary button: tint-to-light capsule with a glow, mono label in tracked capitals. Every existing `BrandButtonStyle` use picks this up.
+public struct BrandButtonStyle: ButtonStyle {
+    public var tint: Color
+    public init(tint: Color = Brand.ignition) { self.tint = tint }
+    public func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(Brand.label(14)).tracking(1.2)
+            .foregroundStyle(Brand.space)
+            .padding(.horizontal, 22).padding(.vertical, 12)
+            .background(Capsule().fill(LinearGradient(colors: [tint, tint.opacity(0.78)], startPoint: .top, endPoint: .bottom)))
+            .overlay { Capsule().strokeBorder(.white.opacity(0.35), lineWidth: 1) }
+            .shadow(color: tint.opacity(0.45), radius: configuration.isPressed ? 4 : 12)
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .lift()
+    }
+}
+
+/// Secondary action: tinted outline capsule, readable on any surface.
+public struct LabSecondaryButtonStyle: ButtonStyle {
+    public var tint: Color
+    public init(tint: Color = Brand.telemetry) { self.tint = tint }
+    public func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(Brand.label(13)).tracking(1)
+            .foregroundStyle(Brand.ink)
+            .padding(.horizontal, 18).padding(.vertical, 10)
+            .background(Capsule().fill(tint.opacity(configuration.isPressed ? 0.28 : 0.14)))
+            .overlay { Capsule().strokeBorder(tint.opacity(0.55), lineWidth: 1) }
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .lift()
+    }
+}
