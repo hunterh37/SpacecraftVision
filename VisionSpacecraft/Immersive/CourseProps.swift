@@ -32,11 +32,8 @@ final class CourseProps {
                 let asset = Pylon().with { $0.radius = Float(o.radius); $0.height = Float(o.height) }
                 e = (try? await RealityHD.entity(asset, seed: seed)) ?? Self.column(o, tint: 0xE2561B)
             case .pillar:
-                if let c = try? await RealityHD.entity("canyon-wall", seed: seed) {
-                    // Authored pillar scaled to the obstacle radius and height.
-                    let b = c.visualBounds(relativeTo: nil)
-                    let w = max(b.extents.x, b.extents.z, 0.01), h = max(b.extents.y, 0.01)
-                    c.scale = [Float(o.radius * 2) / w, Float(o.height) / h, Float(o.radius * 2) / w]
+                let asset = CanyonWall().with { $0.kind = .pillar; $0.radius = Float(o.radius); $0.height = Float(o.height) }
+                if let c = try? await RealityHD.entity(asset, seed: seed) {
                     e = c
                 } else {
                     e = Self.column(o, tint: 0x8C6A4F)
@@ -107,26 +104,49 @@ final class CourseProps {
         return m
     }
 
-    /// Rock slabs along both sides of the centreline (canyon-wall is not yet in the RealityHD catalog).
+    /// RealityHD `canyon-wall` faces along both sides of the centreline, faces toward the channel;
+    /// procedural rock slabs when the asset is unavailable.
     static func canyonWalls(_ c: Canyon) async -> Entity {
         let root = Entity()
         root.name = "canyon"
+        let pts = c.centreline
+        for side in [1.0, -1.0] {
+            // Offset polyline (right side +1), in RealityKit XZ (x east, z = -north).
+            var line: [V2] = []
+            for (i, p) in pts.enumerated() {
+                let a = pts[max(0, i - 1)], b = pts[min(pts.count - 1, i + 1)]
+                let d = b - a, l = max(simd_len(Vec3(d.x, d.y, 0)), 1e-6)
+                let n = Vec3(d.y, -d.x, 0) / l
+                let q = p + n * c.offset * side
+                line.append(V2(Float(q.x), Float(-q.y)))
+            }
+            // The face looks toward the polyline's left normal: run forward on the right, backward on the left.
+            if side < 0 { line.reverse() }
+            let asset = CanyonWall().with { $0.kind = .face; $0.polyline = line; $0.height = Float(c.height) }
+            if let e = try? await RealityHD.entity(asset, seed: side > 0 ? 51 : 52) {
+                root.addChild(e)
+            } else {
+                root.addChild(slabs(c, side: side))
+            }
+        }
+        return root
+    }
+
+    static func slabs(_ c: Canyon, side: Double) -> Entity {
+        let root = Entity()
         let rock = PartMeshFactory.paint(0x9A6B4A, rough: 0.95)
         let H = Float(c.height)
         for (a, b) in zip(c.centreline, c.centreline.dropFirst()) {
             let d = b - a
             let len = Float(simd_len(Vec3(d.x, d.y, 0)))
             guard len > 0.1 else { continue }
-            let n = Vec3(d.y, -d.x, 0) / Double(len)   // right-hand normal
+            let n = Vec3(d.y, -d.x, 0) / Double(len)
             let heading = Float(atan2(d.x, d.y))
-            for side in [-1.0, 1.0] {
-                let mid = (a + b) / 2 + n * (c.offset + 3) * side
-                // Slightly longer than the segment so corners close.
-                let m = ModelEntity(mesh: .generateBox(size: [6, H, len + 12]), materials: [rock])
-                m.position = rk(Vec3(mid.x, mid.y, 0)) + [0, H / 2, 0]
-                m.orientation = simd_quatf(angle: -heading, axis: [0, 1, 0])
-                root.addChild(m)
-            }
+            let mid = (a + b) / 2 + n * (c.offset + 3) * side
+            let m = ModelEntity(mesh: .generateBox(size: [6, H, len + 12]), materials: [rock])
+            m.position = rk(Vec3(mid.x, mid.y, 0)) + [0, H / 2, 0]
+            m.orientation = simd_quatf(angle: -heading, axis: [0, 1, 0])
+            root.addChild(m)
         }
         return root
     }
