@@ -38,7 +38,10 @@ final class CraftPoser {
     init(craft root: Entity) {
         PartTagComponent.registerComponent()
         func walk(_ e: Entity) {
-            if let t = e.components[PartTagComponent.self] { parts.append((t.partId, e)); return }
+            if let t = e.components[PartTagComponent.self] {
+                parts.append((t.partId, e.name.hasSuffix("-mount") ? (e.children.first ?? e) : e))
+                return
+            }
             for c in e.children { walk(c) }
         }
         walk(root)

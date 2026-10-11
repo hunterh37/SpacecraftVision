@@ -270,10 +270,12 @@ final class RangeScene {
         // Ring gates: try RealityHD "ring-gate", else a torus placeholder; uniform scale r / 3.5, base hidden above 20 m.
         for g in course.gates {
             let gate = await PartMeshFactory.entity("ring-gate")
-            if g.centre.z > 20, gate.children.count > 1 { gate.children[1].isEnabled = false }
+            let placeholder = PartMeshFactory.isPlaceholder(gate)
+            if placeholder, g.centre.z > 20, gate.children.count > 1 { gate.children[1].isEnabled = false }
             let s = Float(g.innerRadius / 3.5)
             gate.scale = .init(repeating: s)
-            gate.position = rk(g.centre) - [0, 4.5 * s, 0]
+            // RealityHD ring-gate: 8 m ring on an A-frame, ring centre 4 m below its 9.02 m top.
+            gate.position = rk(g.centre) - [0, (placeholder ? 4.5 : 5.02) * s, 0]
             courseHolder.addChild(gate)
             // Number label pole for orientation.
             let beacon = ModelEntity(mesh: .generateSphere(radius: 1.2), materials: [PartMeshFactory.unlit(0xF2C230)])
