@@ -2,38 +2,37 @@ import Foundation
 import Observation
 import TaskGuideCore
 
-/// Observable wrapper around `TaskGuideEngine` for SwiftUI presentation.
 @Observable
 @MainActor
 public final class TaskGuideController {
-    private let engine: TaskGuideEngine
+    private let engine: WorkshopGuideEngine
 
-    public private(set) var state: TaskGuideState
-    /// Optional review focus for completed tasks; does not affect engine advancement.
+    public private(set) var state: WorkshopGuideState
     public private(set) var reviewTaskIndex: Int?
 
     public init(snapshot: CraftStateSnapshot = .init()) {
-        let engine = TaskGuideEngine(snapshot: snapshot)
+        let engine = WorkshopGuideEngine(snapshot: snapshot)
         self.engine = engine
         self.state = engine.state
     }
 
-    public var displayedTask: BuildTaskDefinition? {
+    public var isReviewing: Bool { reviewTaskIndex != nil }
+
+    public var displayedTaskID: WorkshopTaskID? {
         if let reviewTaskIndex {
-            return BuildMissionV0.task(at: reviewTaskIndex)
+            return WorkshopTaskID.allCases.first { $0.index == reviewTaskIndex }
         }
-        if state.sessionPhase == .buildComplete {
-            return BuildMissionV0.tasks.last
-        }
-        return state.currentTask
+        return state.currentTaskID
     }
 
     public var displayedTargetID: GuidanceTargetID? {
         switch state.sessionPhase {
         case .overview, .exited:
             return nil
-        case .buildComplete, .inProgress:
-            return displayedTask?.targetID
+        case .workshopComplete:
+            return reviewTaskIndex.flatMap { idx in WorkshopTaskID.allCases.first { $0.index == idx }?.targetID }
+        case .inProgress:
+            return displayedTaskID?.targetID
         }
     }
 
@@ -42,15 +41,31 @@ public final class TaskGuideController {
         refresh()
     }
 
-    public func startBuild() {
-        reviewTaskIndex = nil
-        engine.startBuild()
+    public func startGuide() {
+        clearReviewFocus()
+        engine.startGuide()
         refresh()
     }
 
-    public func acknowledgeCurrent() {
-        reviewTaskIndex = nil
-        engine.acknowledgeCurrent()
+    public func acknowledgeMission() {
+        clearReviewFocus()
+        engine.acknowledgeMission()
+        refresh()
+    }
+
+    public func noteComponentSelection(partID: String) {
+        engine.noteComponentSelection(partID: partID)
+        refresh()
+    }
+
+    public func noteTabletopScaleChanged(newValue: Bool, userInitiated: Bool) {
+        engine.noteTabletopScaleChanged(newValue: newValue, userInitiated: userInitiated)
+        refresh()
+    }
+
+    public func checkDesign() {
+        clearReviewFocus()
+        engine.checkDesign()
         refresh()
     }
 
@@ -59,9 +74,11 @@ public final class TaskGuideController {
             if review > 1 {
                 reviewTaskIndex = review - 1
             } else {
-                // From reviewing task 1, leave review; if advancement is still on task 1, show overview.
-                reviewTaskIndex = nil
-                if state.currentTaskIndex == 1 {
+                clearReviewFocus()
+                if state.sessionPhase == .inProgress,
+                   state.currentTaskIndex == 1,
+                   state.completionRecords.isEmpty
+                {
                     engine.returnToOverview()
                     refresh()
                 }
@@ -72,8 +89,8 @@ public final class TaskGuideController {
         switch state.sessionPhase {
         case .overview, .exited:
             return
-        case .buildComplete:
-            reviewTaskIndex = BuildMissionV0.taskCount
+        case .workshopComplete:
+            reviewTaskIndex = WorkshopMissionV2.taskCount
         case .inProgress:
             guard let current = state.currentTaskIndex else { return }
             if current <= 1 {
@@ -86,28 +103,31 @@ public final class TaskGuideController {
     }
 
     public func exitGuide() {
-        reviewTaskIndex = nil
+        clearReviewFocus()
         engine.exitGuide()
         refresh()
     }
 
     public func resetGuide() {
-        reviewTaskIndex = nil
+        clearReviewFocus()
         engine.resetGuide()
         refresh()
     }
 
     public func focusTask(index: Int) {
-        guard let task = BuildMissionV0.task(at: index) else { return }
-        let status = state.status(for: task)
-        switch status {
+        guard let task = WorkshopTaskID.allCases.first(where: { $0.index == index }) else { return }
+        switch state.status(for: task) {
         case .completed:
             reviewTaskIndex = index
         case .current:
-            reviewTaskIndex = nil
+            clearReviewFocus()
         case .notStarted, .blocked:
             break
         }
+    }
+
+    public func returnToLive() {
+        clearReviewFocus()
     }
 
     public func clearReviewFocus() {

@@ -1,22 +1,43 @@
 import Foundation
 
-/// Input snapshot for task evaluation. Independent of RealityKit and AppModel.
+/// Input snapshot for Workshop task evaluation. Independent of RealityKit and AppModel.
 public struct CraftStateSnapshot: Equatable, Sendable, Hashable {
-    /// Part definition identifiers currently on the craft (stack and radial).
+    public var missionID: String
     public var partIDs: [String]
-    /// Human-readable launch blocker titles. Empty means no blockers.
     public var launchBlockers: [String]
-    /// Sea-level thrust-to-weight ratio.
     public var thrustToWeightSL: Double
+    public var wetMass: Double
+    public var massCap: Double
+    public var cost: Int
+    public var budget: Int
+    public var partCount: Int
+    public var partCap: Int
+    public var workshopTabletop: Bool
 
     public init(
+        missionID: String = "",
         partIDs: [String] = [],
         launchBlockers: [String] = [],
-        thrustToWeightSL: Double = 0
+        thrustToWeightSL: Double = 0,
+        wetMass: Double = 0,
+        massCap: Double = 0,
+        cost: Int = 0,
+        budget: Int = 0,
+        partCount: Int = 0,
+        partCap: Int = 0,
+        workshopTabletop: Bool = false
     ) {
+        self.missionID = missionID
         self.partIDs = partIDs
         self.launchBlockers = launchBlockers
         self.thrustToWeightSL = thrustToWeightSL
+        self.wetMass = wetMass
+        self.massCap = massCap
+        self.cost = cost
+        self.budget = budget
+        self.partCount = partCount
+        self.partCap = partCap
+        self.workshopTabletop = workshopTabletop
     }
 
     public var hasLaunchBlockers: Bool { !launchBlockers.isEmpty }
@@ -26,7 +47,6 @@ public struct CraftStateSnapshot: Equatable, Sendable, Hashable {
     }
 }
 
-/// Essential BUILD V0 part identifiers recognized by the evaluator.
 public enum EssentialPartID: String, Sendable, CaseIterable, Hashable {
     case probeCore = "probe-core"
     case fuelTankS = "fuel-tank-s"
@@ -34,63 +54,17 @@ public enum EssentialPartID: String, Sendable, CaseIterable, Hashable {
 
     public var displayName: String {
         switch self {
-        case .probeCore: return "command core"
-        case .fuelTankS: return "fuel tank"
-        case .engineLiquidSmall: return "liquid rocket engine"
+        case .probeCore: return "Probe Core"
+        case .fuelTankS: return "Fuel Tank S"
+        case .engineLiquidSmall: return "Liquid Engine S"
         }
     }
-}
 
-public extension CraftStateSnapshot {
-    /// Demo fixtures for the isolated preview and tests only.
-    enum DemoFixture: String, CaseIterable, Sendable, Identifiable {
-        case empty
-        case partial
-        case fullyAssembled
-        case fullyAssembledBlocked
-        case launchReady
-
-        public var id: String { rawValue }
-
-        public var title: String {
-            switch self {
-            case .empty: return "Empty craft"
-            case .partial: return "Partially assembled"
-            case .fullyAssembled: return "Fully assembled"
-            case .fullyAssembledBlocked: return "Assembled but blocked"
-            case .launchReady: return "Launch-ready"
-            }
-        }
-
-        public var snapshot: CraftStateSnapshot {
-            switch self {
-            case .empty:
-                return CraftStateSnapshot(partIDs: [], launchBlockers: ["No command core"], thrustToWeightSL: 0)
-            case .partial:
-                return CraftStateSnapshot(
-                    partIDs: [EssentialPartID.probeCore.rawValue],
-                    launchBlockers: ["Missing fuel tank", "Missing engine"],
-                    thrustToWeightSL: 0
-                )
-            case .fullyAssembled:
-                return CraftStateSnapshot(
-                    partIDs: EssentialPartID.allCases.map(\.rawValue),
-                    launchBlockers: [],
-                    thrustToWeightSL: 0.8
-                )
-            case .fullyAssembledBlocked:
-                return CraftStateSnapshot(
-                    partIDs: EssentialPartID.allCases.map(\.rawValue),
-                    launchBlockers: ["Over budget"],
-                    thrustToWeightSL: 1.4
-                )
-            case .launchReady:
-                return CraftStateSnapshot(
-                    partIDs: EssentialPartID.allCases.map(\.rawValue) + ["nose-cone", "parachute"],
-                    launchBlockers: [],
-                    thrustToWeightSL: 1.4
-                )
-            }
+    public var roleExplanation: String {
+        switch self {
+        case .probeCore: return "The probe core is the command brain of the rocket. It holds control and mission systems."
+        case .fuelTankS: return "The fuel tank stores propellant the engine burns during flight."
+        case .engineLiquidSmall: return "The liquid engine generates thrust to lift the rocket."
         }
     }
 }

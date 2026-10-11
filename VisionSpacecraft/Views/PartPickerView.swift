@@ -1,11 +1,15 @@
 import SwiftUI
 import LabUI
 import SpacecraftCore
+import TaskGuideCore
+import TaskGuideUI
 
 /// Part palette (specs/02): mission-allowed parts, the current stack top to bottom with radial parts,
 /// fuel load per tank, reorder and remove.
 struct PartPickerView: View {
     @Environment(AppModel.self) private var model
+    @State private var targetBounds: [GuidanceTargetID: CGRect] = [:]
+    private let guidanceSpace = "PartsGuidance"
 
     var body: some View {
         @Bindable var model = model
@@ -41,44 +45,63 @@ struct PartPickerView: View {
                     }
                 }
                 LabCaption("Stack, top to bottom", tint: Brand.telemetry).padding(.top, 4)
-                if model.craft.stack.isEmpty { Text("Empty. Add a probe core first.").font(Lab.soft(14)).foregroundStyle(Lab.muted) }
-                ForEach(model.craft.stack) { p in
-                    let selected = model.selectedStackPart == p.id
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 6) {
-                            Text(p.definition.displayName).font(Lab.soft(15)).foregroundStyle(selected ? Brand.telemetry : Lab.ink)
-                            Spacer()
-                            Button { model.moveStack(p.id, by: -1) } label: { Image(systemName: "arrow.up") }.buttonStyle(LabIconButton())
-                            Button { model.moveStack(p.id, by: 1) } label: { Image(systemName: "arrow.down") }.buttonStyle(LabIconButton())
-                            Button(role: .destructive) { model.removeStack(p.id) } label: { Image(systemName: "trash").foregroundStyle(Lab.danger) }.buttonStyle(LabIconButton())
-                        }
-                        if p.definition.propellantMass > 0 {
-                            HStack {
-                                Text("FUEL \(Int((p.fuelLoad * 100).rounded()))%").font(Brand.label(11)).tracking(1.5).foregroundStyle(Lab.muted)
-                                Slider(value: Binding(get: { p.fuelLoad }, set: { model.setFuel(p.id, ($0 * 20).rounded() / 20) }),
-                                       in: 0...1, step: 0.05)
-                                    .tint(Brand.ignition)
-                                    .disabled(model.mission.fixedFuelLoad != nil)
-                            }
-                            if model.mission.fixedFuelLoad != nil {
-                                Text("Fuel load fixed by the mission.").font(Lab.soft(11)).foregroundStyle(Lab.faint)
-                            }
-                        }
-                        ForEach(model.craft.radial.filter { $0.parentId == p.id }) { r in
-                            HStack {
-                                Text("+ \(r.definition.displayName)\(r.count > 1 ? " x\(r.count)" : "")").font(Lab.mono(12)).foregroundStyle(Lab.muted)
+                Group {
+                    if model.craft.stack.isEmpty { Text("Empty. Add a probe core first.").font(Lab.soft(14)).foregroundStyle(Lab.muted) }
+                    ForEach(model.craft.stack) { p in
+                        let selected = model.selectedStackPart == p.id
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 6) {
+                                Text(p.definition.displayName).font(Lab.soft(15)).foregroundStyle(selected ? Brand.telemetry : Lab.ink)
                                 Spacer()
-                                Button(role: .destructive) { model.removeRadial(r.id) } label: { Image(systemName: "minus") }.buttonStyle(LabIconButton())
+                                Button { model.moveStack(p.id, by: -1) } label: { Image(systemName: "arrow.up") }.buttonStyle(LabIconButton())
+                                Button { model.moveStack(p.id, by: 1) } label: { Image(systemName: "arrow.down") }.buttonStyle(LabIconButton())
+                                Button(role: .destructive) { model.removeStack(p.id) } label: { Image(systemName: "trash").foregroundStyle(Lab.danger) }.buttonStyle(LabIconButton())
                             }
-                            .padding(.leading, 12)
+                            if p.definition.propellantMass > 0 {
+                                HStack {
+                                    Text("FUEL \(Int((p.fuelLoad * 100).rounded()))%").font(Brand.label(11)).tracking(1.5).foregroundStyle(Lab.muted)
+                                    Slider(value: Binding(get: { p.fuelLoad }, set: { model.setFuel(p.id, ($0 * 20).rounded() / 20) }),
+                                           in: 0...1, step: 0.05)
+                                        .tint(Brand.ignition)
+                                        .disabled(model.mission.fixedFuelLoad != nil)
+                                }
+                                if model.mission.fixedFuelLoad != nil {
+                                    Text("Fuel load fixed by the mission.").font(Lab.soft(11)).foregroundStyle(Lab.faint)
+                                }
+                            }
+                            ForEach(model.craft.radial.filter { $0.parentId == p.id }) { r in
+                                HStack {
+                                    Text("+ \(r.definition.displayName)\(r.count > 1 ? " x\(r.count)" : "")").font(Lab.mono(12)).foregroundStyle(Lab.muted)
+                                    Spacer()
+                                    Button(role: .destructive) { model.removeRadial(r.id) } label: { Image(systemName: "minus") }.buttonStyle(LabIconButton())
+                                }
+                                .padding(.leading, 12)
+                            }
+                        }
+                        .labCard(tint: selected ? Brand.telemetry : Lab.edge, corner: 16, padding: 12)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            model.selectedStackPart = p.id
+                            model.taskGuide.noteComponentSelection(partID: p.partId)
                         }
                     }
-                    .labCard(tint: selected ? Brand.telemetry : Lab.edge, corner: 16, padding: 12)
-                    .contentShape(Rectangle())
-                    .onTapGesture { model.selectedStackPart = p.id }
                 }
+                .guidanceTarget(.partsStack, coordinateSpaceName: guidanceSpace)
+
                 VStack(alignment: .leading, spacing: 12) {
-                    Toggle("Tabletop scale", isOn: $model.workshopTabletop).font(Lab.soft(15)).tint(Brand.telemetry)
+                    Toggle(isOn: Binding(
+                        get: { model.workshopTabletop },
+                        set: { newValue in
+                            model.workshopTabletop = newValue
+                            model.syncTaskGuideSnapshot()
+                            model.taskGuide.noteTabletopScaleChanged(newValue: newValue, userInitiated: true)
+                        }
+                    )) {
+                        Text("Tabletop scale")
+                    }
+                    .font(Lab.soft(15))
+                    .tint(Brand.telemetry)
+                    .guidanceTarget(.tabletopToggle, coordinateSpaceName: guidanceSpace)
                     HStack {
                         Button("Load reference craft") { model.loadReferenceCraft() }.buttonStyle(LabGhostButton())
                         Button("Load Saturn V") { model.loadSaturnV() }.buttonStyle(LabGhostButton())
@@ -90,8 +113,20 @@ struct PartPickerView: View {
                 .padding(.top, 4)
             }
             .padding(24)
+            .coordinateSpace(name: guidanceSpace)
+            .onPreferenceChange(GuidanceTargetBoundsKey.self) { targetBounds = $0 }
+            .overlay {
+                let active: GuidanceTargetID? = {
+                    switch model.taskGuideTargetID {
+                    case .partsStack, .tabletopToggle: return model.taskGuideTargetID
+                    default: return nil
+                    }
+                }()
+                GuidanceHighlightOverlay(activeID: active, bounds: targetBounds, showsArrow: false)
+            }
         }
         .labWindow(tint: Brand.trajectory, variant: .dusk, aurora: 0.16)
+        .onAppear { model.syncTaskGuideSnapshot() }
     }
 
     var budgetMeter: some View {

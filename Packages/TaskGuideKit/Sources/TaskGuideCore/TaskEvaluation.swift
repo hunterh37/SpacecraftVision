@@ -1,25 +1,18 @@
 import Foundation
 
-/// Result of evaluating essential component presence.
 public struct ComponentValidationResult: Equatable, Sendable {
     public let isSatisfied: Bool
     public let missingParts: [EssentialPartID]
 
-    public var missingDisplayNames: [String] {
-        missingParts.map(\.displayName)
-    }
+    public var missingDisplayNames: [String] { missingParts.map(\.displayName) }
 
     public var summary: String {
-        if isSatisfied {
-            return "All essential components are present."
-        }
-        let names = missingDisplayNames.joined(separator: ", ")
-        return "Missing: \(names)."
+        if isSatisfied { return "All essential components are present." }
+        return "Missing: \(missingDisplayNames.joined(separator: ", "))."
     }
 }
 
-/// Result of evaluating launch-readiness / preflight constraints.
-public struct PreflightValidationResult: Equatable, Sendable {
+public struct DesignValidationResult: Equatable, Sendable {
     public let isSatisfied: Bool
     public let missingParts: [EssentialPartID]
     public let launchBlockers: [String]
@@ -29,8 +22,7 @@ public struct PreflightValidationResult: Equatable, Sendable {
     public var failureReasons: [String] {
         var reasons: [String] = []
         if !missingParts.isEmpty {
-            let names = missingParts.map(\.displayName).joined(separator: ", ")
-            reasons.append("Missing components: \(names)")
+            reasons.append("Missing components: \(missingParts.map(\.displayName).joined(separator: ", "))")
         }
         if !launchBlockers.isEmpty {
             reasons.append("Launch blockers: \(launchBlockers.joined(separator: "; "))")
@@ -42,14 +34,11 @@ public struct PreflightValidationResult: Equatable, Sendable {
     }
 
     public var summary: String {
-        if isSatisfied {
-            return "Launch readiness checks passed."
-        }
+        if isSatisfied { return "Design checks passed for the current craft and mission." }
         return failureReasons.joined(separator: " ")
     }
 }
 
-/// Pure evaluation helpers. No RealityKit or AppModel dependency.
 public enum TaskEvaluator {
     public static let minimumTWR: Double = 1.0
 
@@ -58,11 +47,11 @@ public enum TaskEvaluator {
         return ComponentValidationResult(isSatisfied: missing.isEmpty, missingParts: missing)
     }
 
-    public static func validatePreflight(_ snapshot: CraftStateSnapshot) -> PreflightValidationResult {
+    public static func validateDesign(_ snapshot: CraftStateSnapshot) -> DesignValidationResult {
         let components = validateComponents(snapshot)
         let twrOK = snapshot.thrustToWeightSL > minimumTWR
         let satisfied = components.isSatisfied && !snapshot.hasLaunchBlockers && twrOK
-        return PreflightValidationResult(
+        return DesignValidationResult(
             isSatisfied: satisfied,
             missingParts: components.missingParts,
             launchBlockers: snapshot.launchBlockers,
