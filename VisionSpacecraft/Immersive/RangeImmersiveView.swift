@@ -49,7 +49,7 @@ struct RangeImmersiveView: View {
             scene.applyView(model.flightView, course: model.mission.course)
             scene.subscription = content.subscribe(to: SceneEvents.Update.self) { [model, scene] e in
                 model.flight.tick(e.deltaTime)
-                scene.updateCraft(model.flight, view: model.flightView, course: model.mission.course)
+                scene.updateCraft(model.flight, view: model.flightView, course: model.mission.course, dt: e.deltaTime)
                 model.walkthrough.tick(e.deltaTime, model: model)
                 scene.updateIndicators(model, dt: Float(e.deltaTime))
             }
@@ -74,18 +74,31 @@ struct RangeImmersiveView: View {
         .task(id: SkyKey(style: model.skyStyle, timeOfDay: model.mission.course.timeOfDay)) {
             scene.updateSky(style: model.skyStyle, timeOfDay: model.mission.course.timeOfDay)
         }
-        .task(id: RibbonKey(n: model.preview?.samples.count ?? 0, t: model.preview?.result.duration ?? 0, view: model.flightView)) {
+        .task(id: RibbonKey(n: model.preview?.samples.count ?? 0, t: model.preview?.result.duration ?? 0,
+                           sig: RibbonKey.signature(model.preview), view: model.flightView)) {
             scene.rebuildRibbon(model.preview, view: model.flightView)
             scene.applyView(model.flightView, course: model.mission.course)
         }
-        .onChange(of: model.flight.launchID) { scene.resetCraftPose() }
+        .onChange(of: model.flight.launchID) { scene.resetCraftPose(); scene.resetGates() }
+        .onChange(of: model.flight.gates) { _, n in scene.markGatePassed(n) }
         .onChange(of: model.walkthrough.successCount) { scene.playSuccess() }
         .onAppear { model.walkthrough.startIfNeeded() }
         .modifier(FollowToSpace())
     }
 
-    struct RibbonKey: Hashable { var n: Int; var t: Double; var view: FlightView }
     struct SkyKey: Hashable { var style: SkyStyle; var timeOfDay: TimeOfDay }
+    struct RibbonKey: Hashable {
+        var n: Int; var t: Double; var sig: Int; var view: FlightView
+        /// Sum of sampled positions so equal-length paths with different shapes still refresh.
+        static func signature(_ r: FlightReport?) -> Int {
+            guard let s = r?.samples, !s.isEmpty else { return 0 }
+            var h = Hasher()
+            for i in Swift.stride(from: 0, to: s.count, by: max(1, s.count / 32)) {
+                h.combine(Int(s[i].position.x * 10)); h.combine(Int(s[i].position.y * 10)); h.combine(Int(s[i].position.z * 10))
+            }
+            return h.finalize()
+        }
+    }
 }
 
 @MainActor
@@ -113,6 +126,8 @@ final class RangeScene {
     var subscription: EventSubscription?
     private var builtStatic = false
     private var builtCourse: String?
+    private var gateBeacons: [ModelEntity] = []
+    private var chaseFocus: SIMD3<Float>?
 
     init() {
         skyHolder.position.y = -1.6
@@ -190,6 +205,7 @@ final class RangeScene {
         guard builtCourse != course.id else { return }
         builtCourse = course.id
         courseHolder.children.removeAll()
+        gateBeacons.removeAll()
         // Landing zone pylons.
         if let zone = course.landingZone {
             for k in 0..<8 {
@@ -214,6 +230,7 @@ final class RangeScene {
             let beacon = ModelEntity(mesh: .generateSphere(radius: 1.2), materials: [PartMeshFactory.unlit(0xF2C230)])
             beacon.position = rk(g.centre) + [0, Float(g.innerRadius + 3), 0]
             courseHolder.addChild(beacon)
+            gateBeacons.append(beacon)
         }
         if let fy = course.finishY {
             let finish = ModelEntity(mesh: .generateBox(size: [180, 0.6, 0.6]), materials: [PartMeshFactory.unlit(0xF2F2F0, alpha: 0.6)])
@@ -256,14 +273,29 @@ final class RangeScene {
         resetCraftPose()
     }
 
+    /// Gate n (1-based count) passed: beacon turns green and pulses; burst at the gate.
+    func markGatePassed(_ count: Int) {
+        guard count > 0, count <= gateBeacons.count else { return }
+        let b = gateBeacons[count - 1]
+        b.model?.materials = [PartMeshFactory.unlit(0x3FD97A)]
+        var t = b.transform; t.scale = .init(repeating: 2.2)
+        b.move(to: t, relativeTo: b.parent, duration: 0.25, timingFunction: .easeOut)
+        indicators.playBurst(at: b.position(relativeTo: nil))
+    }
+
+    func resetGates() {
+        for b in gateBeacons { b.model?.materials = [PartMeshFactory.unlit(0xF2C230)]; b.scale = .one }
+    }
+
     func resetCraftPose() {
+        chaseFocus = nil
         let com = Float(craftModel.map { -$0.position.y } ?? 2)
         craftHolder.position = [0, com, 0]
         craftHolder.orientation = simd_quatf(angle: 0, axis: [0, 1, 0])
         plume?.isEnabled = false; drogue?.isEnabled = false; mainChute?.isEnabled = false
     }
 
-    func updateCraft(_ f: FlightController, view: FlightView, course: Course) {
+    func updateCraft(_ f: FlightController, view: FlightView, course: Course, dt: Double = 1.0 / 90) {
         guard f.phase != .idle else { return }
         let com = Float(craftModel.map { -$0.position.y } ?? 2)
         craftHolder.position = rk(f.position) + [0, com, 0]
@@ -284,7 +316,10 @@ final class RangeScene {
         }
         if view == .chase {
             let target = rk(f.position)
-            root.position = -target + [0, 1.2, -15]
+            let k = 1 - exp(-6 * Float(min(dt, 0.1)))
+            let focus = chaseFocus.map { $0 + (target - $0) * k } ?? target
+            chaseFocus = focus
+            root.position = -focus + [0, 1.2, -15]
         }
     }
 
