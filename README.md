@@ -30,10 +30,3 @@ open VisionSpacecraft.xcodeproj
 ```
 
 Needs Xcode 26 and the visionOS 26 SDK. RealityHD is fetched by SwiftPM from its `main` branch.
-
-## The header animation
-
-The banner above is rendered from [`docs/wish-animation.html`](docs/wish-animation.html), a self-contained canvas
-animation (add `?t=5.7` to the URL to freeze it at any second). GitHub cannot run HTML in a README, so the page is
-captured frame by frame into `docs/rocketcraft-header.gif`. The page expects the Polea and Nebula display fonts next
-to it (not included in this repo) and falls back to system fonts without them.
