@@ -20,6 +20,10 @@ public final class ScriptGuidance: FlightGuidance, VMHost {
     public private(set) var activeLine: Int?
     public private(set) var commands: [CommandEvent] = []
     private var sensorFaults: Set<String> = []
+    /// When set, the next `update` call is recorded step by step into `lastTrace`.
+    var traceNextUpdate = false
+    private(set) var lastTrace: TraceRecorder?
+    private var recorder: TraceRecorder?
     private var started = false
     private var startTime = 0.0
 
@@ -49,6 +53,13 @@ public final class ScriptGuidance: FlightGuidance, VMHost {
 
     public func update(_ sim: FlightSimulation, dt: Double) -> GuidanceTickResult {
         if !started { started = true; startTime = sim.time }
+        let recorder: TraceRecorder? = traceNextUpdate ? TraceRecorder() : nil
+        if let recorder {
+            traceNextUpdate = false
+            vm.traceHook = { stop in recorder.stop(stop) }
+            self.recorder = recorder
+        }
+        defer { if recorder != nil { vm.traceHook = nil; self.recorder = nil; lastTrace = recorder; lastTrace?.instructions = vm.instructionsUsed } }
         do {
             try vm.call("update", [.float(dt)])
             activeLine = vm.currentLine
@@ -82,6 +93,12 @@ public final class ScriptGuidance: FlightGuidance, VMHost {
     }
 
     public func craftCall(_ name: String, _ args: [Value]) throws -> Value {
+        let result = try craftCallInner(name, args)
+        recorder?.call(name, args, result)
+        return result
+    }
+
+    func craftCallInner(_ name: String, _ args: [Value]) throws -> Value {
         guard let sim else { throw VMFault(.name, "craft is not connected") }
         switch name {
         case "position": return .vec(sim.position.x, sim.position.y, sim.position.z)
