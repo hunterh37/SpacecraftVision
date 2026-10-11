@@ -4,6 +4,7 @@ import FlightSim
 import FlightCode
 import FlightRunner
 import Curriculum
+import LabUI
 
 enum SpaceID: String { case workshop, range }
 enum WindowID { static let main = "main", parts = "parts", code = "code", analysis = "analysis" }
@@ -37,6 +38,8 @@ final class AppModel {
     var preview: FlightReport?
     var previewing = false
     private var previewTask: Task<Void, Never>?
+    /// One block/Python/trace workspace per lesson, so edits survive switching lessons and windows.
+    private var workspaces: [Int: CodeWorkspaceModel] = [:]
 
     // Flight
     let flight = FlightController()
@@ -83,6 +86,30 @@ final class AppModel {
 
     func starterCode(for m: Mission) -> String {
         Lesson.all.first { $0.missionId == m.id }?.starterCode ?? Lesson.all[0].starterCode
+    }
+
+    func workspace(for lesson: Lesson) -> CodeWorkspaceModel {
+        if let w = workspaces[lesson.id] { return w }
+        let missionId = lesson.missionId
+        let w = CodeWorkspaceModel(lesson: lesson, initialSource: sources[missionId],
+            sink: { [weak self] src in self?.sources[missionId] = src; self?.schedulePreview() },
+            tracer: { [weak self] src, t in
+                guard let self else { return .empty() }
+                let craft = self.craft, mission = lesson.mission
+                return await Task.detached(priority: .userInitiated) { FlightTracer.trace(source: src, craft: craft, mission: mission, atTime: t) }.value
+            })
+        workspaces[lesson.id] = w
+        if w.usesBlocks { w.publish() }
+        return w
+    }
+
+    /// The first thing wrong with the player's code: a compile error, or the first runtime fault from the preview.
+    var codeProblem: (line: Int, text: String)? {
+        if case let .error(e) = compileStatus { return (e.line, e.message) }
+        if let f = preview?.faults.first, f.hasPrefix("Line "), let colon = f.firstIndex(of: ":"), let line = Int(f[f.index(f.startIndex, offsetBy: 5)..<colon]) {
+            return (line, String(f[f.index(colon, offsetBy: 2)...]))
+        }
+        return nil
     }
 
     func resetCode() { sources[mission.id] = starterCode(for: mission); schedulePreview() }
