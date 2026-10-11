@@ -133,6 +133,14 @@ private struct DebugLaunch: ViewModifier {
                     for _ in 0..<40 { if model.preview?.compileError == nil, model.preview != nil { break }; try? await Task.sleep(for: .milliseconds(250)) }
                     model.lastReport = model.preview; model.reports = model.preview.map { [$0] } ?? []
                     openWindow(id: WindowID.analysis)
+                case _ where route.hasPrefix("deck"):
+                    // deck-<stage>: the Learn deck in the range, e.g. deck-pseudocode, deck-implement
+                    let l = Lesson.all[0]
+                    model.select(lesson: l); model.openLesson = l; model.learnActive = true; model.flightView = .ground
+                    if let st = route.split(separator: "-").dropFirst().first, let stage = LessonStage.allCases.first(where: { String(describing: $0) == st }) { model.lessonStage = stage }
+                    if model.lessonStage == .implement || model.lessonStage == .run || model.lessonStage == .analyze { model.source = l.referenceCode }
+                    try? await Task.sleep(for: .seconds(2))
+                    await SpaceSwitcher(model: model, open: openSpace, dismiss: dismissSpace).show(.range)
                 default:
                     if route.hasPrefix("lesson") {
                         let parts = route.dropFirst(6).split(separator: "-")

@@ -2,6 +2,7 @@ import SwiftUI
 import LabUI
 import Curriculum
 import SpacecraftCore
+import FlightRunner
 
 /// Learn mode deck, a range attachment beside the pad. One stage on screen, one primary button,
 /// and the scene indicators point at the part of the rocket the stage is about.
@@ -15,6 +16,7 @@ struct LessonDeckView: View {
     @State private var placed: [String] = []
     @State private var checkResult: Bool?
     @State private var picking = false
+    @State private var pathCursor = 3.0
 
     private var lesson: Lesson { model.lesson ?? Lesson.all[0] }
     private var stage: LessonStage { model.lessonStage }
@@ -23,7 +25,8 @@ struct LessonDeckView: View {
         VStack(alignment: .leading, spacing: 16) {
             header
             if picking { picker } else {
-                stageDots
+                stagePicker
+                if stage.rawValue >= LessonStage.implement.rawValue { pathPanel }
                 content.frame(maxWidth: .infinity, alignment: .leading).font(Lab.soft(17))
                 footer
             }
@@ -46,11 +49,11 @@ struct LessonDeckView: View {
     // MARK: Header
 
     private var header: some View {
-        HStack(spacing: 12) {
+        HStack(alignment: .bottom, spacing: 12) {
             Button { picking.toggle() } label: {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("LESSON \(String(format: "%02d", lesson.id)) ▾").font(Brand.label(12)).foregroundStyle(Brand.telemetry).tracking(2)
-                    Text(lesson.title).font(.system(size: 22, weight: .bold, design: .rounded)).foregroundStyle(Brand.ink)
+                VStack(alignment: .leading, spacing: 6) {
+                    LabCaption("Lesson \(String(format: "%02d", lesson.id)) · Learn \(picking ? "▴" : "▾")")
+                    Text(lesson.title).font(Lab.display(24)).foregroundStyle(Brand.ink)
                 }
             }
             .buttonStyle(.plain)
@@ -77,30 +80,30 @@ struct LessonDeckView: View {
                             Text(String(repeating: "★", count: s) + String(repeating: "☆", count: 3 - s)).foregroundStyle(Brand.ignition)
                         }
                     }
-                    .labCard(tint: l.id == lesson.id ? Brand.telemetry : Lab.edge, corner: 14, padding: 12)
+                    .padding(.horizontal, 14).padding(.vertical, 12)
+                    .labCard(corner: 16, tint: l.id == lesson.id ? Brand.telemetry : Lab.edge, aurora: 0.06)
                 }
                 .buttonStyle(.plain)
             }
         }
     }
 
-    private var stageDots: some View {
-        HStack(spacing: 6) {
-            ForEach(LessonStage.allCases) { s in
-                Button { model.lessonStage = s } label: {
-                    VStack(spacing: 4) {
-                        Capsule().fill(s.rawValue <= stage.rawValue ? Brand.telemetry : Lab.faint.opacity(0.4)).frame(height: 4)
-                        Text(short(s)).font(Brand.label(10)).tracking(1)
-                            .foregroundStyle(s == stage ? Brand.ink : Lab.muted)
-                    }
-                }
-                .buttonStyle(.plain)
-            }
-        }
+    private var stagePicker: some View {
+        LabStagePicker(titles: LessonStage.allCases.map(short), selection: Binding(
+            get: { stage.rawValue },
+            set: { if let s = LessonStage(rawValue: $0) { model.lessonStage = s } }))
+    }
+
+    /// The trajectory of the rocket: the simulator's forecast of the current code, the rocket at the cursor, and the real rocket live.
+    private var pathPanel: some View {
+        FlightPathView(report: model.preview.flatMap { $0.compileError == nil ? $0 : nil }, course: lesson.mission.course,
+                       live: model.liveFlight, cursor: $pathCursor, height: 120)
+            .padding(14)
+            .labCard(corner: 22, tint: Brand.telemetry, aurora: 0.12)
     }
 
     private func short(_ s: LessonStage) -> String {
-        switch s { case .concept: "IDEA"; case .pseudocode: "ORDER"; case .implement: "CODE"; case .run: "FLY"; case .analyze: "DEBRIEF" }
+        switch s { case .concept: "Idea"; case .pseudocode: "Order"; case .implement: "Code"; case .run: "Fly"; case .analyze: "Debrief" }
     }
 
     // MARK: Stages
@@ -132,7 +135,25 @@ struct LessonDeckView: View {
         }
     }
 
-    private var pseudocode: some View {
+    @ViewBuilder private var pseudocode: some View {
+        if let p = lesson.blockProgram {
+            let ws = model.workspace(for: lesson)
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Arrange the blocks in the order the rocket runs them. One does not belong.").foregroundStyle(Lab.muted)
+                BlockComposer(program: p,
+                              order: Binding(get: { ws.order }, set: { ws.order = $0; checkResult = nil }),
+                              values: Binding(get: { ws.values }, set: { ws.values = $0 }))
+                    .frame(height: 300)
+                if checkResult == false {
+                    Text("Order is off. Remove a block with its x, or drag to reorder.").font(Lab.soft(14)).foregroundStyle(Brand.ignition)
+                }
+            }
+        } else {
+            textPseudocode
+        }
+    }
+
+    private var textPseudocode: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Tap blocks in run order. One does not belong.").foregroundStyle(Lab.muted)
             VStack(alignment: .leading, spacing: 6) {
@@ -145,7 +166,8 @@ struct LessonDeckView: View {
                 if placed.isEmpty { Text("Empty").foregroundStyle(Lab.faint) }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .labCard(tint: checkResult == false ? Brand.ignition : Brand.telemetry, corner: 16, padding: 12)
+            .padding(12)
+            .labCard(corner: 16, tint: checkResult == false ? Brand.ignition : Brand.telemetry, aurora: 0.06)
             FlowBlocks(items: pool) { b in
                 if let k = pool.firstIndex(of: b) { pool.remove(at: k) }
                 placed.append(b); checkResult = nil
@@ -159,11 +181,11 @@ struct LessonDeckView: View {
 
     private var implement: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Fill the TODOs in update(dt). The dotted path in front of you re-predicts on every edit.")
+            Text("Open the code window and tune your blocks. The path above re-predicts on every change.")
             Text("Goal: \(goalText)").font(Lab.soft(14)).foregroundStyle(Lab.muted)
             prediction
             Button("Fill reference code", systemImage: "wand.and.stars") { model.source = lesson.referenceCode }
-                .buttonStyle(LabGhostButton())
+                .buttonStyle(LabSecondaryButtonStyle())
         }
     }
 
@@ -193,7 +215,8 @@ struct LessonDeckView: View {
                             .foregroundStyle(picked ? Brand.telemetry : Lab.faint)
                         Text(o).foregroundStyle(Lab.ink).frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .labCard(tint: picked ? Brand.telemetry : Lab.edge, corner: 14, padding: 10)
+                    .padding(.horizontal, 14).padding(.vertical, 10)
+                    .labCard(corner: 16, tint: picked ? Brand.telemetry : Lab.edge, aurora: 0.06)
                 }
                 .buttonStyle(.plain)
             }
@@ -236,10 +259,10 @@ struct LessonDeckView: View {
 
     @ViewBuilder private var secondary: some View {
         switch stage {
-        case .pseudocode: Button("Shuffle") { reset() }.buttonStyle(LabGhostButton())
-        case .implement: Button("Open code") { openCode() }.buttonStyle(LabGhostButton())
-        case .run where model.flight.phase == .flying: Button("Open code") { openCode() }.buttonStyle(LabGhostButton())
-        case .analyze: Button("Fly again") { model.lessonStage = .run }.buttonStyle(LabGhostButton())
+        case .pseudocode: Button(lesson.blockProgram != nil ? "Clear" : "Shuffle") { if lesson.blockProgram != nil { model.workspace(for: lesson).order = []; checkResult = nil } else { reset() } }.buttonStyle(LabSecondaryButtonStyle())
+        case .implement: Button("Open code") { openCode() }.buttonStyle(LabSecondaryButtonStyle())
+        case .run where model.flight.phase == .flying: Button("Open code") { openCode() }.buttonStyle(LabSecondaryButtonStyle())
+        case .analyze: Button("Fly again") { model.lessonStage = .run }.buttonStyle(LabSecondaryButtonStyle())
         default: EmptyView()
         }
     }
@@ -256,7 +279,7 @@ struct LessonDeckView: View {
 
     private var primaryDisabled: Bool {
         switch stage {
-        case .pseudocode: checkResult != true && placed.isEmpty
+        case .pseudocode: checkResult != true && (lesson.blockProgram != nil ? model.workspace(for: lesson).order.isEmpty : placed.isEmpty)
         case .run: model.flight.phase == .flying || !model.blockers.isEmpty
         case .analyze: model.grade(lesson) != nil && model.answers[lesson.id] == nil
         default: false
@@ -293,7 +316,8 @@ struct LessonDeckView: View {
     }
 
     private func check() {
-        checkResult = placed == lesson.blocks
+        if let p = lesson.blockProgram { checkResult = model.workspace(for: lesson).order == p.solution }
+        else { checkResult = placed == lesson.blocks }
         if checkResult == true { model.pseudocodePassed.insert(lesson.id) }
     }
 
@@ -326,6 +350,7 @@ struct LessonDeckView: View {
     }
 }
 
+/// Fallback block chips for lessons without a block palette: tappable, in the shared card style.
 struct FlowBlocks: View {
     let items: [String]
     let tap: (String) -> Void
@@ -333,9 +358,12 @@ struct FlowBlocks: View {
         VStack(alignment: .leading, spacing: 8) {
             ForEach(items, id: \.self) { b in
                 Button { tap(b) } label: {
-                    Text(b).font(.system(.callout, design: .monospaced)).padding(.vertical, 4)
+                    Text(b).font(Lab.mono(14)).foregroundStyle(Lab.ink)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 14).padding(.vertical, 10)
+                        .labCard(corner: 14, tint: Brand.trajectory, aurora: 0.06)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.plain)
             }
         }
     }
