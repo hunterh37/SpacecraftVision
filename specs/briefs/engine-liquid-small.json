@@ -1,0 +1,33 @@
+{
+  "budget": 10000,
+  "id": "engine-liquid-small",
+  "kind": "prop",
+  "materials": [
+    "metal.heat-tint",
+    "metal.steel",
+    "metal.titanium"
+  ],
+  "name": "Liquid engine, small",
+  "notes": "Vision Spacecraft draft brief. Size in metres.",
+  "parts": [
+    "mount",
+    "turbopump",
+    "plumbing",
+    "bell"
+  ],
+  "references": [],
+  "size": [
+    1.25,
+    1.25,
+    1.5
+  ],
+  "style": "photoreal aerospace hardware",
+  "summary": "Small liquid-fuel engine: turbopump block, plumbing, gimbal mount, bell nozzle with regenerative cooling tubes and heat tint.",
+  "tags": [
+    "prop",
+    "aerospace"
+  ],
+  "theme": "Aerospace",
+  "threshold": 0.85,
+  "tolerance": 0.12
+}

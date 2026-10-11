@@ -1,0 +1,32 @@
+{
+  "budget": 10000,
+  "id": "fuel-tank-m",
+  "kind": "prop",
+  "materials": [
+    "metal.aluminum-brushed",
+    "metal.steel"
+  ],
+  "name": "Fuel tank, medium",
+  "notes": "Vision Spacecraft draft brief. Size in metres.",
+  "parts": [
+    "barrel",
+    "stack-rings",
+    "stringers",
+    "fill-port"
+  ],
+  "references": [],
+  "size": [
+    1.25,
+    1.25,
+    2.0
+  ],
+  "style": "photoreal aerospace hardware",
+  "summary": "Liquid fuel tank, 1.25 m diameter, 2 m: brushed aluminum barrel with weld seams, stringers, stack rings top and bottom, fill port.",
+  "tags": [
+    "prop",
+    "aerospace"
+  ],
+  "theme": "Aerospace",
+  "threshold": 0.85,
+  "tolerance": 0.12
+}

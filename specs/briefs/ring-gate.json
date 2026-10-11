@@ -1,0 +1,33 @@
+{
+  "budget": 10000,
+  "id": "ring-gate",
+  "kind": "prop",
+  "materials": [
+    "metal.painted:E8622C",
+    "metal.steel",
+    "emissive.warm"
+  ],
+  "name": "Ring gate",
+  "notes": "Vision Spacecraft draft brief. Size in metres.",
+  "parts": [
+    "torus",
+    "stripes",
+    "beacons",
+    "base"
+  ],
+  "references": [],
+  "size": [
+    8,
+    1,
+    8
+  ],
+  "style": "photoreal aerospace hardware",
+  "summary": "Course ring gate, 8 m: painted steel torus with hazard stripes and beacon lights on a base frame.",
+  "tags": [
+    "prop",
+    "aerospace"
+  ],
+  "theme": "Aerospace",
+  "threshold": 0.85,
+  "tolerance": 0.12
+}
