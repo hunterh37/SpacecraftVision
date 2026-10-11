@@ -611,10 +611,14 @@ public final class FlightSimulation {
                 let wp = asin(min(max(dir.z, -1), 1))
                 let wy = atan2(dir.x, dir.y)
                 let gain = 0.5 * min(1, q / 5000)
-                weather.x = gain * (wp - pitch)
-                weather.y = gain * wrapAngle(wy - yaw) * cos(pitch) * cos(pitch)
+                // Past vertical the nose points back along the heading: weathercock in the equivalent attitude.
+                let back = pitch > .pi / 2
+                let elev = back ? .pi - pitch : pitch, head = back ? yaw + .pi : yaw
+                weather.x = gain * (wp - elev) * (back ? -1 : 1)
+                weather.y = gain * wrapAngle(wy - head) * cos(elev) * cos(elev)
             }
-            pitch = min(max(pitch + (rates.x + weather.x) * dt, -.pi / 2), .pi / 2)
+            // Rockets may lean past vertical (pitch above 90 deg tilts the nose back along the heading).
+            pitch = min(max(pitch + (rates.x + weather.x) * dt, -.pi / 2), .pi * 0.75)
             yaw = wrapAngle(yaw + (rates.y + weather.y) * dt)
             roll = wrapAngle(roll + rates.z * dt)
         }
