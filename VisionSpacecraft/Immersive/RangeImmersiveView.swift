@@ -24,6 +24,7 @@ struct RangeImmersiveView: View {
                 scene.env = env
             }
             content.add(scene.skyHolder)
+            content.add(scene.lightHolder)
             scene.updateSky(style: model.skyStyle, timeOfDay: model.mission.course.timeOfDay)
             content.add(scene.root)
             if let hud = attachments.entity(for: "hud") {
@@ -91,6 +92,9 @@ struct RangeImmersiveView: View {
 final class RangeScene {
     let root = Entity()           // world root, moved/scaled per view
     let skyHolder = Entity()      // stays around the viewer when the range shifts for chase/tabletop
+    let lightHolder = Entity()
+    private let sun = Entity()
+    private let fill = Entity()
     let staticHolder = Entity()
     let courseHolder = Entity()
     let craftHolder = Entity()    // positioned by the sim
@@ -111,6 +115,8 @@ final class RangeScene {
     private var builtCourse: String?
 
     init() {
+        lightHolder.addChild(sun)
+        lightHolder.addChild(fill)
         root.addChild(staticHolder)
         root.addChild(courseHolder)
         root.addChild(ribbonHolder)
@@ -121,6 +127,7 @@ final class RangeScene {
     func updateSky(style: SkyStyle, timeOfDay: TimeOfDay) {
         skyHolder.children.removeAll()
         if let sky = SkyBackdrop.make(style, timeOfDay: timeOfDay, radius: 3000) { skyHolder.addChild(sky) }
+        SceneLighting.update(sun: sun, fill: fill, style: style, timeOfDay: timeOfDay)
     }
 
     // MARK: Walkthrough indicators

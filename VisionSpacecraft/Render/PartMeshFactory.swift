@@ -11,6 +11,9 @@ import SpacecraftCore
 enum PartMeshFactory {
     private static var missing: Set<String> = []
     private static var meshCache: [String: MeshResource] = [:]
+    private static var textureCache: [String: TextureResource] = [:]
+
+    enum Finish: String { case brushedSteel = "BrushedSteel", paintedMetal = "PaintedMetal", moldedPlastic = "MoldedPlastic" }
 
     static func entity(_ id: String, seed: UInt64 = 1) async -> Entity {
         if !missing.contains(id) {
@@ -37,6 +40,30 @@ enum PartMeshFactory {
 
     static func paint(_ hex: UInt32, rough: Float = 0.45) -> PhysicallyBasedMaterial { metal(hex, rough: rough, metallic: 0.1) }
 
+    /// Maps from the supplied Poliigon archives. A plain PBR material is used if a resource is unavailable.
+    static func finish(_ kind: Finish) -> PhysicallyBasedMaterial {
+        let fallback: PhysicallyBasedMaterial
+        switch kind {
+        case .brushedSteel: fallback = metal(0xB8BCC0, rough: 0.35)
+        case .paintedMetal: fallback = metal(0x303238, rough: 0.65, metallic: 0.25)
+        case .moldedPlastic: fallback = metal(0x45474B, rough: 0.8, metallic: 0)
+        }
+        guard let base = texture("\(kind.rawValue)BaseColor") else { return fallback }
+        var material = fallback
+        material.baseColor = .init(tint: .white, texture: .init(base))
+        if let roughness = texture("\(kind.rawValue)Roughness") {
+            material.roughness = .init(texture: .init(roughness))
+        }
+        return material
+    }
+
+    private static func texture(_ name: String) -> TextureResource? {
+        if let cached = textureCache[name] { return cached }
+        guard let loaded = try? TextureResource.load(named: name, in: .main) else { return nil }
+        textureCache[name] = loaded
+        return loaded
+    }
+
     static func color(_ hex: UInt32, alpha: CGFloat = 1) -> UIColor {
         UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255,
                 blue: CGFloat(hex & 0xFF) / 255, alpha: alpha)
@@ -53,7 +80,7 @@ enum PartMeshFactory {
     /// Surface of revolution around +y from a profile of (radius, y) points, with smooth normals.
     static func lathe(_ key: String, _ profile: [(Float, Float)], segments: Int = 48, closed: Bool = false) -> MeshResource {
         if let m = meshCache[key] { return m }
-        var pos: [SIMD3<Float>] = [], nrm: [SIMD3<Float>] = [], idx: [UInt32] = []
+        var pos: [SIMD3<Float>] = [], nrm: [SIMD3<Float>] = [], uv: [SIMD2<Float>] = [], idx: [UInt32] = []
         let n = profile.count
         for (j, p) in profile.enumerated() {
             // 2D tangent along profile -> normal
@@ -67,6 +94,7 @@ enum PartMeshFactory {
                 let c = cos(ang), s = sin(ang)
                 pos.append(SIMD3(p.0 * c, p.1, p.0 * s))
                 nrm.append(simd_normalize(SIMD3(n2.x * c, n2.y, n2.x * s) + SIMD3(0, 1e-6, 0)))
+                uv.append(SIMD2(Float(i) / Float(segments), Float(j) / Float(max(1, n - 1))))
             }
         }
         let row = UInt32(segments + 1)
@@ -81,6 +109,7 @@ enum PartMeshFactory {
         var d = MeshDescriptor(name: key)
         d.positions = MeshBuffer(pos)
         d.normals = MeshBuffer(nrm)
+        d.textureCoordinates = MeshBuffer(uv)
         // Double-sided: add reversed triangles so open shells render from inside too.
         var both = idx
         for k in stride(from: 0, to: idx.count, by: 3) { both += [idx[k], idx[k + 2], idx[k + 1]] }
@@ -114,8 +143,8 @@ enum PartMeshFactory {
             e.position = p; e.orientation = rot
             root.addChild(e)
         }
-        let white = paint(0xF2F2F0), silver = metal(0xC0C4C8, rough: 0.3), dark = metal(0x2A2D31, rough: 0.5),
-            steel = metal(0x8A8F96, rough: 0.25), orange = paint(0xE8622C), gold = metal(0xC9A23A, rough: 0.3)
+        let white = paint(0xF2F2F0), silver = finish(.brushedSteel), dark = finish(.paintedMetal),
+            steel = finish(.brushedSteel), plastic = finish(.moldedPlastic), orange = paint(0xE8622C), gold = metal(0xC9A23A, rough: 0.3)
         let r: Float = 0.625
         switch id {
         case "nose-cone":
@@ -127,7 +156,7 @@ enum PartMeshFactory {
             add(lathe("nose", [(0, 0)] + pts), white)
             add(cylinder("nose-band", r: r * 1.002, h: 0.06), orange)
         case "probe-core":
-            add(cylinder("probe", r: r, h: 0.4), dark)
+            add(cylinder("probe", r: r, h: 0.4), plastic)
             add(cylinder("probe-band", r: r * 1.01, h: 0.08), gold, at: [0, 0.16, 0])
         case "command-pod":
             add(cylinder("pod", r: r, h: 1.4, top: 0.31), white)
@@ -173,7 +202,7 @@ enum PartMeshFactory {
         case "parachute":
             add(cylinder("chute-pack", r: 0.2, h: 0.3), orange)
         case "battery-pack":
-            add(.generateBox(size: [0.3, 0.2, 0.4], cornerRadius: 0.02), dark, at: [0, 0.1, 0])
+            add(.generateBox(size: [0.3, 0.2, 0.4], cornerRadius: 0.02), plastic, at: [0, 0.1, 0])
         case "imu":
             add(.generateBox(size: [0.1, 0.1, 0.1], cornerRadius: 0.01), gold, at: [0, 0.05, 0])
         case "lidar-sensor":

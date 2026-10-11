@@ -11,6 +11,7 @@ struct WorkshopImmersiveView: View {
     @State private var craftHolder = Entity()
     @State private var env: RealEnvironment?
     @State private var skyHolder = Entity()
+    @State private var sun = Entity()
 
     var body: some View {
         RealityView { content, attachments in
@@ -22,6 +23,7 @@ struct WorkshopImmersiveView: View {
                 self.env = env
             }
             content.add(skyHolder)
+            content.add(sun)
             updateSky()
             root.addChild(Self.hangarShell())
             craftHolder.position = [0, 0, -3]
@@ -75,6 +77,7 @@ struct WorkshopImmersiveView: View {
     private func updateSky() {
         skyHolder.children.removeAll()
         if let sky = SkyBackdrop.make(model.skyStyle, timeOfDay: .afternoon, radius: 300) { skyHolder.addChild(sky) }
+        SceneLighting.update(sun: sun, style: model.skyStyle, timeOfDay: .afternoon)
     }
 
     static func hangarShell() -> Entity {
