@@ -121,8 +121,9 @@ public struct TraceView: View {
 
 // MARK: - Buttons
 
-struct LabPrimaryButton: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
+public struct LabPrimaryButton: ButtonStyle {
+    public init() {}
+    public func makeBody(configuration: Configuration) -> some View {
         configuration.label.font(Lab.label(11)).tracking(1.2).foregroundStyle(Color(red: 0.02, green: 0.07, blue: 0.16))
             .padding(.horizontal, 18).padding(.vertical, 8)
             .background(Capsule().fill(LinearGradient(colors: [Lab.teal, Color(red: 0.5, green: 0.71, blue: 1)], startPoint: .leading, endPoint: .trailing)))
@@ -131,8 +132,9 @@ struct LabPrimaryButton: ButtonStyle {
     }
 }
 
-struct LabIconButton: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
+public struct LabIconButton: ButtonStyle {
+    public init() {}
+    public func makeBody(configuration: Configuration) -> some View {
         configuration.label.font(.system(size: 12)).foregroundStyle(Lab.ink).frame(width: 34, height: 30)
             .background(Capsule().fill(Lab.edge.opacity(configuration.isPressed ? 0.3 : 0.14)))
             .overlay { Capsule().stroke(Lab.edge.opacity(0.3), lineWidth: 1) }

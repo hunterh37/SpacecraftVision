@@ -184,3 +184,88 @@ public extension View {
         .shadow(color: tint.opacity(0.16), radius: 26)
     }
 }
+
+public extension View {
+    /// The labPanel atmosphere stretched edge to edge behind a whole window, so screens around the coding
+    /// surfaces share its look instead of the system glass.
+    func labWindow(tint: Color = Brand.telemetry, variant: AuroraVariant = .dusk, aurora: Double = 0.28) -> some View {
+        background {
+            ZStack {
+                LinearGradient(colors: [Brand.hull, Color(red: 0.06, green: 0.08, blue: 0.14), Brand.space], startPoint: .top, endPoint: .bottom)
+                RadialGradient(colors: [Brand.ignition.opacity(0.18), .clear], center: .bottom, startRadius: 0, endRadius: 520)
+                RadialGradient(colors: [tint.opacity(0.16), .clear], center: .top, startRadius: 0, endRadius: 520)
+                AuroraLayer(variant: variant, strength: aurora)
+                GrainLayer()
+            }
+            .ignoresSafeArea()
+        }
+        .foregroundStyle(Lab.ink)
+        .tint(tint)
+        .preferredColorScheme(.dark)
+    }
+
+    /// Inset surface for rows and groups inside a labWindow: dark hull fill, tinted hairline.
+    func labCard(tint: Color = Lab.edge, corner: CGFloat = 20, padding: CGFloat = 16) -> some View {
+        self.padding(padding)
+            .background(Color(red: 0.02, green: 0.03, blue: 0.14).opacity(0.55), in: RoundedRectangle(cornerRadius: corner, style: .continuous))
+            .overlay { RoundedRectangle(cornerRadius: corner, style: .continuous).strokeBorder(tint.opacity(0.25), lineWidth: 1) }
+    }
+}
+
+/// Section caption in the CodeWorkspace status style: a short tinted rule, then tracked mono capitals.
+public struct LabCaption: View {
+    var text: String
+    var tint: Color
+    public init(_ text: String, tint: Color = Brand.telemetry) { self.text = text; self.tint = tint }
+    public var body: some View {
+        HStack(spacing: 8) {
+            Rectangle().fill(tint).frame(width: 22, height: 3).clipShape(Capsule())
+            Text(text.uppercased()).font(Brand.label(11)).tracking(2).foregroundStyle(tint)
+        }
+    }
+}
+
+/// Window header: mono kicker over a display title, trailing controls.
+public struct LabHeader<Trailing: View>: View {
+    var kicker: String
+    var title: String
+    var tint: Color
+    @ViewBuilder var trailing: Trailing
+    public init(kicker: String, title: String, tint: Color = Brand.ignition, @ViewBuilder trailing: () -> Trailing = { EmptyView() }) {
+        self.kicker = kicker; self.title = title; self.tint = tint; self.trailing = trailing()
+    }
+    public var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(kicker.uppercased()).font(Brand.label(12)).tracking(3).foregroundStyle(tint)
+                Text(title.uppercased()).font(Lab.display(24)).foregroundStyle(Lab.ink).lineLimit(1).minimumScaleFactor(0.6)
+            }
+            Spacer(minLength: 8)
+            trailing
+        }
+    }
+}
+
+/// Quiet capsule button for secondary actions next to LabPrimaryButton.
+public struct LabGhostButton: ButtonStyle {
+    var tint: Color
+    public init(tint: Color = Lab.edge) { self.tint = tint }
+    public func makeBody(configuration: Configuration) -> some View {
+        configuration.label.font(Lab.soft(13)).foregroundStyle(Lab.ink)
+            .padding(.horizontal, 14).padding(.vertical, 7)
+            .background(Capsule().fill(tint.opacity(configuration.isPressed ? 0.3 : 0.12)))
+            .overlay { Capsule().stroke(tint.opacity(0.35), lineWidth: 1) }
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .labHover()
+    }
+}
+
+extension View {
+    @ViewBuilder func labHover() -> some View {
+        #if os(visionOS) || os(iOS)
+        hoverEffect(.highlight)
+        #else
+        self
+        #endif
+    }
+}

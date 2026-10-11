@@ -47,6 +47,13 @@ Units: kg, m, m², N, s, K, W, Wh, kN, kPa, credits (cr). g0 = 9.80665 m/s².
 | `radar-sensor` | Radar | 3.0 | 3.0 | 0.3 dia x 0.12 | 6,000 | 7 | 358 | electronics |
 | `camera-sensor` | Camera | 0.25 | 0.25 | 0.1 cube | 1,500 | 9 | 358 | electronics |
 | `imu` | IMU | 1.2 | 1.2 | 0.1 cube | 2,500 | 0 | 358 | electronics |
+| `saturn-s1c` | Saturn V S-IC | 130,000 | 2,290,000 | 10.06 dia x 42.1 | 2,400,000 | 10 | 900 | Al 2219 skin |
+| `saturn-s2` | Saturn V S-II | 40,100 | 484,100 | 10.06 dia x 24.9 | 1,300,000 | 10 | 700 | Al 2014 skin |
+| `saturn-s4b` | Saturn V S-IVB | 15,200 | 124,700 | 10.06 to 6.6 x 17.8 | 650,000 | 10 | 700 | Al 2014 skin |
+| `saturn-iu` | Saturn V instrument unit | 2,000 | 2,000 | 6.6 dia x 0.91 | 300,000 | 10 | 400 | aluminum honeycomb |
+| `apollo-sla` | Spacecraft LM adapter | 1,800 | 1,800 | 6.6 to 3.9 x 8.5 | 120,000 | 10 | 600 | aluminum honeycomb |
+| `apollo-csm` | Apollo CSM | 11,670 | 30,080 | 3.91 dia x 7.2 | 900,000 | 10 | 2700 | aluminum honeycomb |
+| `apollo-les` | Launch escape system | 4,170 | 4,170 | 1.26 x 9.2 | 200,000 | 10 | 900 | steel truss |
 
 `fuselage-section` is a new part added to `04-realityhd-assets.md` with this catalog. Aircraft had
 no body part.
@@ -120,6 +127,10 @@ interpolation in `07b-physics-model.md`.
 | `engine-solid-small` | 18,400 / 20,000 | 230 / 250 | 8.15 | 50.3 s (410 kg) | none, burns to depletion once lit | none | APCP, 1,800 kg/m³, chamber 5.5 MPa |
 | `engine-liquid-small` | 24,000 / 26,300 | 285 / 312 | 8.60 | 110 s on S, 221 s on M, 442 s on L | 0.40 to 1.00; commanded 0 shuts down, 0 < x < 0.4 clamps to 0.4; restarts unlimited | ±6 deg pitch and yaw, 20 deg/s, 60 W while moving | Kerolox, O/F 2.56, bulk 1,030 kg/m³ |
 | `engine-prop` | 2,800 static; `min(2800, 0.80 * P / v)` in flight | n/a | n/a | battery limited | 0 to 1 of 80 kW shaft power | none | electric, 80 kW peak, 2,400 rpm |
+| `saturn-s1c` | 33,850,000 / 38,850,000 | 263 / 304 | 12,890 | 168 s | none | ±6 deg | RP-1/LOX, 5x F-1 |
+| `saturn-s2` | 2,430,000 / 5,165,000 | 200 / 421 | 1,250 | 355 s | none | ±7 deg | LH2/LOX, 5x J-2 |
+| `saturn-s4b` | 486,000 / 1,033,000 | 200 / 421 | 250 | 438 s | none, restartable | ±7 deg | LH2/LOX, 1x J-2 |
+| `apollo-csm` | 0 / 91,190 | 0 / 314 | 29.6 | 622 s | none | ±6 deg | Aerozine 50/N2O4, SPS |
 
 Engine heating: heat into the engine part = k times jet power `0.5 * F * ve`. k = 0.002 liquid
 (regenerative cooling), 0.004 solid. At full thrust and emissivity 0.8 the equilibrium bell

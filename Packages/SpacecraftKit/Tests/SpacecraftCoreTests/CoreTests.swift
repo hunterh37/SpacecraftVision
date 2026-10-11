@@ -34,3 +34,12 @@ struct CoreTests {
         #expect(b.contains("fail.mass") && b.contains("fail.part-list"))
     }
 }
+
+@Test func saturnVStack() {
+    let c = CraftDesign.saturnV()
+    #expect(abs(c.height - 110.61) < 0.05)
+    let s = c.stats()
+    #expect(abs(s.wetMass - 2_936_850) < 1)
+    #expect(s.hasCommand)
+    #expect(c.stack.allSatisfy { PartCatalog.part($0.partId) != nil })
+}

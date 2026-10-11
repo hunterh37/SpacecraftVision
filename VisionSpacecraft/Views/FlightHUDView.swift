@@ -28,8 +28,7 @@ struct FlightHUDView: View {
         }
         .padding(22)
         .frame(width: 520)
-        .background(Brand.space.opacity(0.55), in: RoundedRectangle(cornerRadius: 30, style: .continuous))
-        .glassBackgroundEffect(in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .labPanel(corner: 30, tint: Brand.ignition, variant: .ember, aurora: 0.28)
         .tint(Brand.ignition)
         .animation(.spring(duration: 0.35), value: f.phase)
         .animation(.spring(duration: 0.35), value: details)
@@ -271,17 +270,16 @@ struct ResultCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             if let f = report.result.failure {
-                Label(f.title, systemImage: "xmark.circle.fill").font(.headline).foregroundStyle(Brand.ignition)
-                Text(f.body).font(.callout)
-                Text(String(format: "At %.1f s", f.time)).font(.caption).foregroundStyle(.secondary)
+                LabCaption(f.title, tint: Brand.ignition)
+                Text(f.body).font(Lab.soft(15)).foregroundStyle(Lab.ink)
+                Text(String(format: "AT %.1f S", f.time)).font(Brand.label(11)).tracking(2).foregroundStyle(Lab.muted)
             } else {
-                Label("Mission passed", systemImage: "checkmark.circle.fill").font(.headline).foregroundStyle(Brand.telemetry)
+                LabCaption("Mission passed", tint: Brand.telemetry)
                 Text("Score \(report.result.score). Apogee \(Int(report.result.apogee)) m, fuel used \(Int(report.result.fuelUsed)) kg.")
-                    .font(.callout)
+                    .font(Lab.soft(15)).foregroundStyle(Lab.ink)
             }
         }
-        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Brand.hull.opacity(0.8), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .labCard(tint: report.result.failure == nil ? Brand.telemetry : Brand.ignition, corner: 16, padding: 14)
     }
 }

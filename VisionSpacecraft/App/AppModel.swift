@@ -215,6 +215,13 @@ final class AppModel {
         schedulePreview()
     }
 
+    /// Saturn V Apollo stack (RealityHD stage assets, AS-506 masses).
+    func loadSaturnV() {
+        craft = .saturnV()
+        selectedStackPart = nil
+        schedulePreview()
+    }
+
     func clearCraft() { craft.stack = []; craft.radial = []; schedulePreview() }
 
     // MARK: Preview

@@ -65,6 +65,12 @@ public struct CraftDesign: Codable, Sendable, Hashable, Identifiable {
         ], payloadMass: payload)
     }
 
+    /// Saturn V Apollo stack, 110.6 m, AS-506 masses.
+    public static func saturnV(fuelLoad: Double = 1.0, payload: Double = 0) -> CraftDesign {
+        let ids = ["apollo-les", "apollo-csm", "apollo-sla", "saturn-iu", "saturn-s4b", "saturn-s2", "saturn-s1c"]
+        return CraftDesign(name: "Saturn V", stack: ids.map { PartInstance(partId: $0, fuelLoad: fuelLoad) }, payloadMass: payload)
+    }
+
     public static func rGates() -> CraftDesign {
         var c = rHop(fuelLoad: 1.0); c.name = "R-gates"; return c
     }

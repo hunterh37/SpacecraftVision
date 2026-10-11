@@ -9,76 +9,89 @@ struct PartPickerView: View {
 
     var body: some View {
         @Bindable var model = model
-        NavigationStack {
-            List {
-                Section {
-                    TipBanner(tip: .hangar)
-                    budgetMeter
-                }
-                Section("Rack: \(model.mission.id) parts") {
-                    ForEach(model.mission.allowedParts, id: \.self) { id in
-                        if let def = PartCatalog.part(id) {
-                            let block = model.addBlock(id)
-                            Button { model.addPart(id) } label: {
-                                HStack {
-                                    Image(systemName: icon(def.category)).frame(width: 28)
-                                    VStack(alignment: .leading) {
-                                        Text(def.displayName)
-                                        Text(block ?? detail(def)).font(.caption)
-                                            .foregroundStyle(block == nil ? Color.secondary : Brand.ignition)
-                                    }
-                                    Spacer()
-                                    Text("\(def.cost) cr").font(.caption.monospacedDigit())
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                LabHeader(kicker: "\(model.mission.id) · Hangar", title: "Parts", tint: Brand.trajectory)
+                TipBanner(tip: .hangar)
+                budgetMeter.labCard()
+                LabCaption("Rack: \(model.mission.id) parts", tint: Brand.trajectory).padding(.top, 4)
+                ForEach(model.mission.allowedParts, id: \.self) { id in
+                    if let def = PartCatalog.part(id) {
+                        let block = model.addBlock(id)
+                        Button { model.addPart(id) } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: icon(def.category)).font(.system(size: 16, weight: .bold))
+                                    .foregroundStyle(Brand.trajectory).frame(width: 36, height: 36)
+                                    .background(Brand.trajectory.opacity(0.14), in: Circle())
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(def.displayName).font(Lab.soft(15)).foregroundStyle(Lab.ink)
+                                    Text(block ?? detail(def)).font(Lab.mono(11))
+                                        .foregroundStyle(block == nil ? Lab.muted : Brand.ignition)
                                 }
-                            }
-                            .disabled(block != nil)
-                        }
-                    }
-                }
-                Section("Stack, top to bottom") {
-                    if model.craft.stack.isEmpty { Text("Empty. Add a probe core first.").foregroundStyle(.secondary) }
-                    ForEach(model.craft.stack) { p in
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text(p.definition.displayName).fontWeight(model.selectedStackPart == p.id ? .bold : .regular)
                                 Spacer()
-                                Button { model.moveStack(p.id, by: -1) } label: { Image(systemName: "arrow.up") }
-                                Button { model.moveStack(p.id, by: 1) } label: { Image(systemName: "arrow.down") }
-                                Button(role: .destructive) { model.removeStack(p.id) } label: { Image(systemName: "trash") }
+                                Text("\(def.cost) CR").font(Brand.label(12)).foregroundStyle(Brand.telemetry)
                             }
-                            .buttonStyle(.borderless)
-                            if p.definition.propellantMass > 0 {
-                                HStack {
-                                    Text("Fuel \(Int((p.fuelLoad * 100).rounded()))%").font(.caption.monospacedDigit())
-                                    Slider(value: Binding(get: { p.fuelLoad }, set: { model.setFuel(p.id, ($0 * 20).rounded() / 20) }),
-                                           in: 0...1, step: 0.05)
-                                        .disabled(model.mission.fixedFuelLoad != nil)
-                                }
-                                if model.mission.fixedFuelLoad != nil {
-                                    Text("Fuel load fixed by the mission.").font(.caption2).foregroundStyle(.secondary)
-                                }
-                            }
-                            ForEach(model.craft.radial.filter { $0.parentId == p.id }) { r in
-                                HStack {
-                                    Text("  + \(r.definition.displayName)\(r.count > 1 ? " x\(r.count)" : "")").font(.callout)
-                                    Spacer()
-                                    Button(role: .destructive) { model.removeRadial(r.id) } label: { Image(systemName: "minus.circle") }
-                                        .buttonStyle(.borderless)
-                                }
-                            }
+                            .labCard(corner: 16, padding: 12)
+                            .contentShape(.hoverEffect, RoundedRectangle(cornerRadius: 16, style: .continuous))
                         }
-                        .contentShape(Rectangle())
-                        .onTapGesture { model.selectedStackPart = p.id }
+                        .buttonStyle(.plain)
+                        .hoverEffect(.highlight)
+                        .disabled(block != nil)
+                        .opacity(block == nil ? 1 : 0.6)
                     }
                 }
-                Section {
-                    Toggle("Tabletop scale", isOn: $model.workshopTabletop)
-                    Button("Load reference craft") { model.loadReferenceCraft() }
-                    Button("Clear craft", role: .destructive) { model.clearCraft() }
+                LabCaption("Stack, top to bottom", tint: Brand.telemetry).padding(.top, 4)
+                if model.craft.stack.isEmpty { Text("Empty. Add a probe core first.").font(Lab.soft(14)).foregroundStyle(Lab.muted) }
+                ForEach(model.craft.stack) { p in
+                    let selected = model.selectedStackPart == p.id
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 6) {
+                            Text(p.definition.displayName).font(Lab.soft(15)).foregroundStyle(selected ? Brand.telemetry : Lab.ink)
+                            Spacer()
+                            Button { model.moveStack(p.id, by: -1) } label: { Image(systemName: "arrow.up") }.buttonStyle(LabIconButton())
+                            Button { model.moveStack(p.id, by: 1) } label: { Image(systemName: "arrow.down") }.buttonStyle(LabIconButton())
+                            Button(role: .destructive) { model.removeStack(p.id) } label: { Image(systemName: "trash").foregroundStyle(Lab.danger) }.buttonStyle(LabIconButton())
+                        }
+                        if p.definition.propellantMass > 0 {
+                            HStack {
+                                Text("FUEL \(Int((p.fuelLoad * 100).rounded()))%").font(Brand.label(11)).tracking(1.5).foregroundStyle(Lab.muted)
+                                Slider(value: Binding(get: { p.fuelLoad }, set: { model.setFuel(p.id, ($0 * 20).rounded() / 20) }),
+                                       in: 0...1, step: 0.05)
+                                    .tint(Brand.ignition)
+                                    .disabled(model.mission.fixedFuelLoad != nil)
+                            }
+                            if model.mission.fixedFuelLoad != nil {
+                                Text("Fuel load fixed by the mission.").font(Lab.soft(11)).foregroundStyle(Lab.faint)
+                            }
+                        }
+                        ForEach(model.craft.radial.filter { $0.parentId == p.id }) { r in
+                            HStack {
+                                Text("+ \(r.definition.displayName)\(r.count > 1 ? " x\(r.count)" : "")").font(Lab.mono(12)).foregroundStyle(Lab.muted)
+                                Spacer()
+                                Button(role: .destructive) { model.removeRadial(r.id) } label: { Image(systemName: "minus") }.buttonStyle(LabIconButton())
+                            }
+                            .padding(.leading, 12)
+                        }
+                    }
+                    .labCard(tint: selected ? Brand.telemetry : Lab.edge, corner: 16, padding: 12)
+                    .contentShape(Rectangle())
+                    .onTapGesture { model.selectedStackPart = p.id }
                 }
+                VStack(alignment: .leading, spacing: 12) {
+                    Toggle("Tabletop scale", isOn: $model.workshopTabletop).font(Lab.soft(15)).tint(Brand.telemetry)
+                    HStack {
+                        Button("Load reference craft") { model.loadReferenceCraft() }.buttonStyle(LabGhostButton())
+                        Button("Load Saturn V") { model.loadSaturnV() }.buttonStyle(LabGhostButton())
+                        Spacer()
+                        Button("Clear craft", role: .destructive) { model.clearCraft() }.buttonStyle(LabGhostButton(tint: Lab.danger))
+                    }
+                }
+                .labCard()
+                .padding(.top, 4)
             }
-            .navigationTitle("Parts")
+            .padding(24)
         }
+        .labWindow(tint: Brand.trajectory, variant: .dusk, aurora: 0.16)
     }
 
     var budgetMeter: some View {
@@ -94,7 +107,7 @@ struct PartPickerView: View {
             ProgressView(value: min(Double(s.cost), Double(m.budget)), total: Double(m.budget))
                 .tint(left >= 0 ? Brand.telemetry : Brand.ignition)
             Text("\(s.cost) / \(m.budget) cr · \(s.partCount) / \(m.partCap) parts · \(Int(s.wetMass)) / \(Int(m.massCap)) kg")
-                .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                .font(Lab.mono(11)).foregroundStyle(Lab.muted)
         }
     }
 

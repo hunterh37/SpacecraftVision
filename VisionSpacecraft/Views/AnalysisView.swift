@@ -1,5 +1,6 @@
 import SwiftUI
 import Charts
+import LabUI
 import FlightRunner
 import FlightSim
 
@@ -12,22 +13,30 @@ struct AnalysisView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                LabHeader(kicker: "\(model.mission.id) · Analysis", title: "Flight data", tint: Brand.trajectory)
                 if let r = model.lastReport {
                     ResultCard(report: r)
                     FlightPlots(report: r, ghosts: Array(model.reports.dropLast().suffix(2)), compact: compact)
                     if !r.events.isEmpty && !compact {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Events").font(.headline)
-                            ForEach(r.events, id: \.self) { Text($0).font(.caption.monospaced()) }
+                            LabCaption("Events", tint: Brand.ignition).padding(.bottom, 6)
+                            ForEach(r.events, id: \.self) { Text($0).font(Lab.mono(12)).foregroundStyle(Lab.muted) }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .labCard()
                     }
                 } else {
-                    ContentUnavailableView("No flights yet", systemImage: "chart.xyaxis.line",
-                                           description: Text("Launch a flight in the range. Plots appear here when it ends."))
+                    VStack(spacing: 10) {
+                        Image(systemName: "chart.xyaxis.line").font(.system(size: 40, weight: .bold)).foregroundStyle(Brand.trajectory)
+                        Text("NO FLIGHTS YET").font(Lab.display(20))
+                        Text("Launch a flight in the range. Plots appear here when it ends.").font(Lab.soft(14)).foregroundStyle(Lab.muted)
+                    }
+                    .frame(maxWidth: .infinity).padding(.vertical, 60)
                 }
             }
-            .padding(20)
+            .padding(28)
         }
+        .labWindow(tint: Brand.trajectory, variant: .dusk, aurora: 0.18)
         .onAppear { model.analysisOpened = true }
     }
 }
@@ -68,18 +77,19 @@ struct FlightPlots: View {
 
     func chart(_ title: String, _ pts: [Pt]) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.subheadline.bold())
+            LabCaption(title, tint: Brand.telemetry)
             Chart(pts) { p in
                 LineMark(x: .value("t (s)", p.t), y: .value(title, p.v))
                     .foregroundStyle(by: .value("Run", p.run))
                     .lineStyle(StrokeStyle(lineWidth: p.run == "This run" ? 2 : 1))
             }
             .chartXAxisLabel("t (s)")
-            .chartForegroundStyleScale(["This run": Color.blue, "Run -1": Color.gray, "Run -2": Color.gray.opacity(0.5)])
+            .chartForegroundStyleScale(["This run": Brand.telemetry, "Run -1": Brand.trajectory.opacity(0.7), "Run -2": Lab.faint])
+            .chartXAxis { AxisMarks { AxisGridLine().foregroundStyle(Lab.edge.opacity(0.15)); AxisValueLabel().font(Lab.mono(10)).foregroundStyle(Lab.muted) } }
+            .chartYAxis { AxisMarks { AxisGridLine().foregroundStyle(Lab.edge.opacity(0.15)); AxisValueLabel().font(Lab.mono(10)).foregroundStyle(Lab.muted) } }
             .frame(height: compact ? 150 : 200)
-            .padding(10)
-            .background(.white.opacity(0.92), in: RoundedRectangle(cornerRadius: 8))
-            .environment(\.colorScheme, .light)
+            .labCard(corner: 16, padding: 12)
+            .environment(\.colorScheme, .dark)
         }
     }
 }

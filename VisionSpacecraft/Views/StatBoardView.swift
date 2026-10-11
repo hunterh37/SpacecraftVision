@@ -10,7 +10,7 @@ struct StatBoardView: View {
         let s = model.craft.stats()
         let m = model.mission
         VStack(alignment: .leading, spacing: 8) {
-            Text("\(m.id) \(m.title)").font(.title2.bold())
+            LabHeader(kicker: m.id, title: m.title)
             Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 6) {
                 row("Wet mass", "\(Int(s.wetMass.rounded())) / \(Int(m.massCap)) kg", warn: s.wetMass > m.massCap)
                 row("Dry mass", "\(Int(s.dryMass.rounded())) kg")
@@ -23,14 +23,14 @@ struct StatBoardView: View {
                 row("Energy", "\(Int(s.energyWh)) / \(Int(m.energyCap)) Wh")
                 row("Lowest heat limit", "\(Int(s.lowestHeatLimit)) K")
             }
-            .font(.body.monospacedDigit())
-            Divider()
+            .font(Lab.mono(15))
+            Rectangle().fill(Lab.edge.opacity(0.2)).frame(height: 1)
             if model.blockers.isEmpty {
                 if s.twrSL < 1 {
                     Label("Thrust to weight below 1.0. The craft will not lift off.", systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Brand.ignition)
                 } else {
-                    Label("Ready to launch", systemImage: "checkmark.seal").foregroundStyle(.green)
+                    LabCaption("Ready to launch", tint: Brand.telemetry)
                 }
             } else {
                 ForEach(model.blockers, id: \.key) { b in
@@ -38,7 +38,7 @@ struct StatBoardView: View {
                         Text("Cannot launch. \(b.title)").bold()
                         Text(b.body).font(.caption)
                     }
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Lab.danger)
                 }
                 Button("Load reference craft", systemImage: "arrow.uturn.backward") { model.loadReferenceCraft() }
                     .buttonStyle(BrandButtonStyle())
@@ -46,7 +46,8 @@ struct StatBoardView: View {
         }
         .padding(24)
         .frame(width: 460)
-        .glassBackgroundEffect()
+        .font(Lab.soft(15))
+        .labPanel(corner: 30, tint: Brand.ignition, variant: .ember, aurora: 0.25)
     }
 
     @ViewBuilder
@@ -54,9 +55,9 @@ struct StatBoardView: View {
         GridRow {
             HStack(spacing: 6) {
                 if let dot { Circle().fill(dot).frame(width: 10, height: 10) }
-                Text(k).foregroundStyle(.secondary)
+                Text(k.uppercased()).font(Brand.label(11)).tracking(1.5).foregroundStyle(Lab.muted)
             }
-            Text(v).foregroundStyle(warn ? .red : .primary)
+            Text(v).foregroundStyle(warn ? Lab.danger : Lab.ink)
         }
     }
 }

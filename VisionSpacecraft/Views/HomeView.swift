@@ -222,8 +222,7 @@ private struct Row<Trailing: View>: View {
             Spacer()
             trailing
         }
-        .padding(20)
-        .background(Brand.hull.opacity(0.8), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .labCard(tint: tint, corner: 22, padding: 20)
         .contentShape(.hoverEffect, RoundedRectangle(cornerRadius: 22, style: .continuous))
         .hoverEffect(.highlight)
     }
