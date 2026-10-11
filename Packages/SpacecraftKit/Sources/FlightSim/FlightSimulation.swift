@@ -180,7 +180,9 @@ public final class FlightSimulation {
 
     // Craft constants
     var dryMass: Double
-    var engines: [EngineSpec]
+    var engines: [EngineSpec] { didSet { throttleFloor = engines.map(\.throttleMin).max() ?? 0 } }
+    var throttleFloor = 0.0
+    var heatEngines: [Int] = [], heatPacks: [Int] = [], heatNeighbour: [Int?] = []
     var solidEngines: [EngineSpec]
     let propEngine: Bool
     var hasFins: Bool
@@ -220,6 +222,7 @@ public final class FlightSimulation {
         energyWh = expanded.reduce(0) { $0 + ($1.def.batteryWh ?? 0) }; energyCapacity = energyWh
         engines = expanded.compactMap { $0.def.realityHDId == "engine-prop" || $0.def.engine?.solid == true ? nil : $0.def.engine }
         solidEngines = expanded.compactMap { $0.def.engine?.solid == true ? $0.def.engine : nil }
+        throttleFloor = engines.map(\.throttleMin).max() ?? 0
         propEngine = expanded.contains { $0.def.realityHDId == "engine-prop" }
         hasFins = expanded.contains { $0.def.realityHDId == "fin-trapezoid" }
         parachute = expanded.first { $0.def.parachute != nil }?.def.parachute
@@ -321,7 +324,7 @@ public final class FlightSimulation {
     public var effectiveThrottle: Double {
         if propEngine { return energyDepleted ? 0 : min(throttleCommand, propThrottleCap) }
         guard throttleCommand > 0, propellant > 0 else { return 0 }
-        return min(1, max(throttleCommand, engines.map(\.throttleMin).max() ?? 0))
+        return min(1, max(throttleCommand, throttleFloor))
     }
     /// Pack limit caps the electric propeller (specs/14: 25 kW per pack, not a failure).
     var propThrottleCap: Double {
@@ -426,6 +429,7 @@ public final class FlightSimulation {
         partIds = Set(alive.map(\.def.realityHDId))
         aeroMaxQ = Self.exposedMaxQ(alive.map(\.def))
         rebuildDrag()
+        rebuildHeatIndex()
     }
 
     func event(_ s: String) { events.append((time, s)) }
@@ -645,12 +649,19 @@ public final class FlightSimulation {
 
     // MARK: Heat (specs/07 heat model, run at 50 Hz)
 
+    private func rebuildHeatIndex() {
+        heatEngines = parts.indices.filter { parts[$0].alive && parts[$0].def.engine != nil && parts[$0].def.realityHDId != "engine-prop" }
+        heatPacks = parts.indices.filter { parts[$0].alive && parts[$0].def.realityHDId == "battery-pack" }
+        let stackOf: [Int: Int] = Dictionary(parts.indices.filter { !parts[$0].radial }.map { (parts[$0].stackIndex, $0) }) { a, _ in a }
+        heatNeighbour = parts.indices.map { i in parts[i].radial ? stackOf[parts[i].stackIndex] : stackOf[parts[i].stackIndex + 1] }
+    }
+
     private func updateHeat(dt: Double, q: Double, airspeed: Double, atm: Atmosphere.Sample, jetPower: Double, draw: Double) {
         let tAmb = atm.temperature
         let cpAir = 1005.0, ch = 2.5e-3
         let tAw = tAmb + 0.89 * airspeed * airspeed / (2 * cpAir)
-        let engineIdx = parts.indices.filter { parts[$0].alive && parts[$0].def.engine != nil && parts[$0].def.realityHDId != "engine-prop" }
-        let packIdx = parts.indices.filter { parts[$0].alive && parts[$0].def.realityHDId == "battery-pack" }
+        if heatNeighbour.count != parts.count { rebuildHeatIndex() }
+        let engineIdx = heatEngines, packIdx = heatPacks
         var flux = [Double](repeating: 0, count: parts.count)
         for i in parts.indices where parts[i].alive {
             let p = parts[i]
@@ -662,11 +673,8 @@ public final class FlightSimulation {
         if !engineIdx.isEmpty && jetPower > 0 { for i in engineIdx { flux[i] += jetPower / Double(engineIdx.count) } }
         if !packIdx.isEmpty { for i in packIdx { flux[i] += 0.03 * draw / Double(packIdx.count) } }
         // Conduction 5 W/K between stack neighbours and from radial parts to their parent.
-        let stackOf: [Int: Int] = Dictionary(parts.indices.filter { !parts[$0].radial }.map { (parts[$0].stackIndex, $0) }) { a, _ in a }
         for i in parts.indices where parts[i].alive {
-            let neighbour: Int?
-            if parts[i].radial { neighbour = stackOf[parts[i].stackIndex] } else { neighbour = stackOf[parts[i].stackIndex + 1] }
-            if let j = neighbour, j != i, parts[j].alive {
+            if let j = heatNeighbour[i], j != i, parts[j].alive {
                 let f = 5 * (parts[j].temperature - parts[i].temperature)
                 flux[i] += f; flux[j] -= f
             }
