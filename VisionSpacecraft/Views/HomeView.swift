@@ -10,9 +10,9 @@ enum GameMode: String, CaseIterable, Identifiable, Hashable {
     var title: String { switch self { case .learn: "Learn"; case .missions: "Missions"; case .workshop: "Workshop" } }
     var line: String {
         switch self {
-        case .learn: "Code a flight, one idea at a time"
-        case .missions: "Build to a brief. Fly the range"
-        case .workshop: "Free build at life size"
+        case .learn: "Your first guided flight, step by step."
+        case .missions: "Build to a brief. Fly the range."
+        case .workshop: "Free build and explore at life size."
         }
     }
     var symbol: String {
@@ -102,15 +102,36 @@ struct HomeView: View {
 private struct ModeCard: View {
     let mode: GameMode
     let progress: String
+    @Environment(AppModel.self) private var model
+
+    /// Learn cue from existing `completed` progress — no new persistence.
+    private var learnCue: String? {
+        guard mode == .learn else { return nil }
+        return model.completed.isEmpty ? "START HERE" : "CONTINUE LEARNING"
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Image(systemName: mode.symbol)
-                .font(.system(size: 34, weight: .bold))
-                .foregroundStyle(mode.tint)
-                .frame(width: 72, height: 72)
-                .background(mode.tint.opacity(0.14), in: Circle())
-            Spacer()
+            HStack(alignment: .top) {
+                Image(systemName: mode.symbol)
+                    .font(.system(size: 34, weight: .bold))
+                    .foregroundStyle(mode.tint)
+                    .frame(width: 72, height: 72)
+                    .background(mode.tint.opacity(0.14), in: Circle())
+                Spacer(minLength: 8)
+                if let learnCue {
+                    Text(learnCue)
+                        .font(Brand.label(10))
+                        .tracking(1)
+                        .foregroundStyle(mode.tint)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.trailing)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(mode.tint.opacity(0.18), in: Capsule())
+                }
+            }
+            Spacer(minLength: 0)
             Text(mode.title.uppercased()).font(Brand.display(26)).foregroundStyle(Brand.ink)
             Text(mode.line).font(.system(size: 16, weight: .medium)).foregroundStyle(Brand.dim)
             Rectangle().fill(mode.tint).frame(width: 36, height: 3)
