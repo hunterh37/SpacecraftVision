@@ -45,7 +45,9 @@ struct BrandEmptyState: View {
 struct BrandLoading: View {
     var caption: String = "Preparing"
     @State private var on = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    @AppStorage("settings.reduceMotion") private var reduceMotionOverride = false
+    private var reduceMotion: Bool { systemReduceMotion || reduceMotionOverride }
     var body: some View {
         VStack(spacing: 12) {
             Circle().strokeBorder(Brand.ignition, lineWidth: 3)
