@@ -183,8 +183,7 @@ struct SceneLoadingOverlay: View {
     var body: some View {
         if space != nil {
             VStack(spacing: 12) {
-                ProgressView().controlSize(.large)
-                Text("Loading scene").font(.headline)
+                BrandLoading(caption: "Loading scene")
             }
             .padding(32)
             .glassBackgroundEffect()

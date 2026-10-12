@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="180" font-family="Menlo" font-size="12">
+<rect width="700" height="180" fill="#090D19"/>
+<g transform="translate(20,20)"><rect width="100" height="100" rx="18" fill="#090D19" stroke="#4FDBF2" stroke-opacity=".3"/><text y="125" fill="#fff">space #090D19</text></g>
+<g transform="translate(135,20)"><rect width="100" height="100" rx="18" fill="#161C2E"/><text y="125" fill="#fff">hull #161C2E</text></g>
+<g transform="translate(250,20)"><rect width="100" height="100" rx="18" fill="#FF6B21"/><text y="125" fill="#fff">ignition #FF6B21</text></g>
+<g transform="translate(365,20)"><rect width="100" height="100" rx="18" fill="#4FDBF2"/><text y="125" fill="#fff">telemetry #4FDBF2</text></g>
+<g transform="translate(480,20)"><rect width="100" height="100" rx="18" fill="#B78FFF"/><text y="125" fill="#fff">trajectory #B78FFF</text></g>
+<g transform="translate(595,20)"><rect width="85" height="100" rx="18" fill="#fff"/><text y="125" fill="#fff">ink</text></g>
+</svg>

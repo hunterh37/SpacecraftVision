@@ -599,8 +599,7 @@ extension Entity {
 struct RangeLoadingPanel: View {
     var body: some View {
         VStack(spacing: 14) {
-            ProgressView().controlSize(.extraLarge)
-            Text("Loading launch range").font(.title3.weight(.semibold))
+            BrandLoading(caption: "Loading launch range")
         }
         .padding(36)
         .glassBackgroundEffect()
