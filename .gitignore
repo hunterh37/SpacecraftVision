@@ -6,3 +6,7 @@ DerivedData/
 xcuserdata/
 *.xcodeproj/
 Packages/SpacecraftKit/.build/
+*.xcuserstate
+*.xcarchive
+*.ipa
+*.dSYM.zip
