@@ -1,0 +1,6 @@
+{ "bundleId": "org.dicyaninlabs.visionspacecraft", "scheme": "VisionSpacecraft", "tailSeconds": 1, "timeoutSeconds": 300,
+  "takes": [
+    { "id": "01-canyon", "route": "range/c5/chase/fly", "duration": 25, "params": { "speed": "1", "seconds": "40", "warmup": "40" } },
+    { "id": "02-hangar", "route": "workshop/hangar", "duration": 10 },
+    { "id": "03-lesson", "route": "lesson/2/concept", "duration": 6 }
+  ] }

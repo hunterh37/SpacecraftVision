@@ -53,7 +53,8 @@ enum DemoRoutes {
                         m.mission = mission; m.craft = craft; m.flightView = view
                         if let ref = m.lessonReference(for: mission) { m.source = ref }
                         await openRange(take)
-                        await take.wait(6); await take.ready()
+                        // `warmup`: seconds for heavy course props (canyon walls) to load before recording starts.
+                        await take.wait(take.param("warmup", default: 6)); await take.ready()
                         m.flight.timeScale = take.param("speed", default: 4)
                         take.cue("launch"); m.launch()
                         await take.wait(take.param("seconds", default: 30)); take.done()

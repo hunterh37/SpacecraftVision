@@ -10,3 +10,4 @@ Packages/SpacecraftKit/.build/
 *.xcarchive
 *.ipa
 *.dSYM.zip
+demo/raw/
