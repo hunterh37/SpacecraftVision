@@ -1076,4 +1076,932 @@ def update(dt):
     else:
         tilt_to(-0.05 * p[0] - 0.3 * v[0], -0.05 * p[1] - 0.3 * v[1])
 """#
+    static let l6Starter = #"""
+import craft
+import math
+
+CRUISE_ALT = 80.0
+CRUISE_SPEED = 30.0
+ALPHA_MAX = 0.17         # rad, 10 deg below the 15 deg stall
+MAX_TURN = 0.33          # rad/s heading rate, 45 deg bank at 30 m/s
+
+def wrap(a):
+    while a > math.pi:
+        a = a - 2.0 * math.pi
+    while a < -math.pi:
+        a = a + 2.0 * math.pi
+    return a
+
+trim = {"i": 0.05}
+
+def hold_altitude(target):
+    pitch, yaw, roll = craft.attitude()
+    vz = craft.velocity()[2]
+    err = target - craft.altitude()
+    # Integral trim removes the steady height error (the wing needs a few degrees of nose-up).
+    trim["i"] = math.clamp(trim["i"] + 0.0004 * err, -0.05, 0.2)
+    want = math.clamp(trim["i"] + 0.03 * err - 0.1 * vz, -0.2, 0.3)
+    # Keep the wing below stall: nose at most ALPHA_MAX above the flight path.
+    v = craft.velocity()
+    gamma = math.atan2(v[2], math.hypot(v[0], v[1]))
+    want = min(want, gamma + ALPHA_MAX)
+    craft.set_pitch(1.5 * (want - pitch))
+
+def hold_speed(target):
+    v = craft.velocity()
+    speed = math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
+    craft.set_throttle(math.clamp(0.4 + 0.15 * (target - speed), 0.0, 1.0))
+
+def turn(rate):
+    craft.set_yaw(math.clamp(rate, -MAX_TURN, MAX_TURN))
+
+def ray(angle_deg):
+    d = craft.lidar(angle_deg)
+    if d < 0.0:
+        return 999.0
+    return d
+
+def front_range():
+    return min(ray(-20.0), ray(-10.0), ray(0.0), ray(10.0), ray(20.0))
+
+# Lesson 6: vector field histogram.
+# Pseudocode from stage 2:
+#   build a 36-sector polar histogram of obstacle density from the lidar scan
+#   smooth it, mark sectors below THRESHOLD as free
+#   pick the free sector closest to the goal direction, with free neighbours
+#   steer toward that sector
+
+THRESHOLD = 0.0       # Tune this.
+VALLEY = 1            # free neighbours needed each side
+W_GOAL = 1.0
+WIDE = 3              # sectors kept between the path and a valley edge
+W_HEADING = 0.5
+TURN_GAIN = 1.5
+MAX_RANGE = 120.0
+R_SAFE = 10.0         # m, craft half span plus margin
+
+def histogram():
+    h = []
+    for k in range(36):
+        h.append(0.0)
+    for hit in craft.lidar_scan():
+        a, d = hit
+        if d > 0.0 and d < MAX_RANGE:
+            w = 1.0 - d / MAX_RANGE
+            # Enlarge each hit by the safety radius seen from the craft (VFH+).
+            spread = math.degrees(math.asin(min(1.0, R_SAFE / d)))
+            k0 = int(math.floor((a - spread + 180.0) / 10.0))
+            k1 = int(math.floor((a + spread + 180.0) / 10.0))
+            for k in range(k0, k1 + 1):
+                h[(k + 36) % 36] = h[(k + 36) % 36] + w * w
+    return h
+
+def smooth(h):
+    s = []
+    for k in range(36):
+        s.append((h[(k + 35) % 36] + 2.0 * h[k] + h[(k + 1) % 36]) / 4.0)
+    return s
+
+def pick_sector(s, goal_deg):
+    # TODO: find runs of sectors below THRESHOLD within 90 deg of the nose (valleys),
+    # pick a steering angle in the valley closest to the goal; return None if none is free.
+    return goal_deg
+
+def least_dense(s):
+    # Fallback when nothing is free: the emptiest sector ahead.
+    best = 0.0
+    low = 1.0e9
+    for k in range(36):
+        centre = k * 10.0 - 180.0 + 5.0
+        if abs(centre) <= 90.0 and s[k] < low:
+            low = s[k]
+            best = centre
+    return best
+
+def update(dt):
+    hold_altitude(CRUISE_ALT)
+    hold_speed(CRUISE_SPEED)
+    gb, ge, gd = craft.goal()
+    s = smooth(histogram())
+    angle = pick_sector(s, math.degrees(gb))
+    if angle is None:
+        angle = least_dense(s)
+        turn(TURN_GAIN * math.radians(angle))
+    else:
+        turn(TURN_GAIN * math.radians(angle))
+    if angle is not None:
+        craft.plot("heading_deg", angle)
+"""#
+    static let l6Reference = #"""
+import craft
+import math
+
+CRUISE_ALT = 80.0
+CRUISE_SPEED = 30.0
+ALPHA_MAX = 0.17         # rad, 10 deg below the 15 deg stall
+MAX_TURN = 0.33          # rad/s heading rate, 45 deg bank at 30 m/s
+
+def wrap(a):
+    while a > math.pi:
+        a = a - 2.0 * math.pi
+    while a < -math.pi:
+        a = a + 2.0 * math.pi
+    return a
+
+trim = {"i": 0.05}
+
+def hold_altitude(target):
+    pitch, yaw, roll = craft.attitude()
+    vz = craft.velocity()[2]
+    err = target - craft.altitude()
+    # Integral trim removes the steady height error (the wing needs a few degrees of nose-up).
+    trim["i"] = math.clamp(trim["i"] + 0.0004 * err, -0.05, 0.2)
+    want = math.clamp(trim["i"] + 0.03 * err - 0.1 * vz, -0.2, 0.3)
+    # Keep the wing below stall: nose at most ALPHA_MAX above the flight path.
+    v = craft.velocity()
+    gamma = math.atan2(v[2], math.hypot(v[0], v[1]))
+    want = min(want, gamma + ALPHA_MAX)
+    craft.set_pitch(1.5 * (want - pitch))
+
+def hold_speed(target):
+    v = craft.velocity()
+    speed = math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
+    craft.set_throttle(math.clamp(0.4 + 0.15 * (target - speed), 0.0, 1.0))
+
+def turn(rate):
+    craft.set_yaw(math.clamp(rate, -MAX_TURN, MAX_TURN))
+
+def ray(angle_deg):
+    d = craft.lidar(angle_deg)
+    if d < 0.0:
+        return 999.0
+    return d
+
+def front_range():
+    return min(ray(-20.0), ray(-10.0), ray(0.0), ray(10.0), ray(20.0))
+
+# Lesson 6: vector field histogram.
+# Pseudocode from stage 2:
+#   build a 36-sector polar histogram of obstacle density from the lidar scan
+#   smooth it, mark sectors below THRESHOLD as free
+#   pick the free sector closest to the goal direction, with free neighbours
+#   steer toward that sector
+
+THRESHOLD = 0.8
+VALLEY = 1            # free neighbours needed each side
+W_GOAL = 1.0
+WIDE = 3              # sectors kept between the path and a valley edge
+W_HEADING = 0.5
+W_PREV = 1.0
+
+vfh = {"prev": -999.0, "prev_abs": -999.0}
+TURN_GAIN = 1.5
+MAX_RANGE = 120.0
+R_SAFE = 10.0         # m, craft half span plus margin
+
+def histogram():
+    h = []
+    for k in range(36):
+        h.append(0.0)
+    for hit in craft.lidar_scan():
+        a, d = hit
+        if d > 0.0 and d < MAX_RANGE:
+            w = 1.0 - d / MAX_RANGE
+            # Enlarge each hit by the safety radius seen from the craft (VFH+).
+            spread = math.degrees(math.asin(min(1.0, R_SAFE / d)))
+            k0 = int(math.floor((a - spread + 180.0) / 10.0))
+            k1 = int(math.floor((a + spread + 180.0) / 10.0))
+            for k in range(k0, k1 + 1):
+                h[(k + 36) % 36] = h[(k + 36) % 36] + w * w
+    return h
+
+def smooth(h):
+    s = []
+    for k in range(36):
+        s.append((h[(k + 35) % 36] + 2.0 * h[k] + h[(k + 1) % 36]) / 4.0)
+    return s
+
+def pick_sector(s, goal_deg):
+    # Valleys: runs of free sectors within 90 deg of the nose. In a wide valley aim WIDE sectors
+    # in from the edge nearest the goal (or at the goal if it lies inside); in a narrow one, its middle.
+    best = None
+    best_cost = 1.0e9
+    k = 9
+    while k <= 26:
+        if s[k] >= THRESHOLD:
+            k = k + 1
+            continue
+        start = k
+        while k <= 26 and s[k] < THRESHOLD:
+            k = k + 1
+        stop = k - 1
+        lo = start * 10.0 - 180.0 + 5.0
+        hi = stop * 10.0 - 180.0 + 5.0
+        if stop - start + 1 < 2 * VALLEY + 1:
+            continue
+        if stop - start + 1 >= 2 * WIDE:
+            a_lo = lo + (WIDE - 1) * 10.0
+            a_hi = hi - (WIDE - 1) * 10.0
+            target = min(max(goal_deg, a_lo), a_hi)
+        else:
+            target = (lo + hi) / 2.0
+        cost = W_GOAL * abs(target - goal_deg) + W_HEADING * abs(target)
+        if vfh["prev"] > -900.0:
+            # Hysteresis: stay with the valley picked last tick instead of flipping sides.
+            cost = cost + W_PREV * abs(math.degrees(wrap(math.radians(target - vfh["prev"]))))
+        if cost < best_cost:
+            best_cost = cost
+            best = target
+    return best
+
+def least_dense(s):
+    # Fallback when nothing is free: the emptiest sector ahead.
+    best = 0.0
+    low = 1.0e9
+    for k in range(36):
+        centre = k * 10.0 - 180.0 + 5.0
+        if abs(centre) <= 90.0 and s[k] < low:
+            low = s[k]
+            best = centre
+    return best
+
+def update(dt):
+    hold_altitude(CRUISE_ALT)
+    hold_speed(CRUISE_SPEED)
+    gb, ge, gd = craft.goal()
+    s = smooth(histogram())
+    pitch, yaw, roll = craft.attitude()
+    if vfh["prev_abs"] > -900.0:
+        vfh["prev"] = math.degrees(wrap(math.radians(vfh["prev_abs"]) - yaw))
+    angle = pick_sector(s, math.degrees(gb))
+    if angle is not None:
+        vfh["prev_abs"] = math.degrees(yaw) + angle
+    if angle is None:
+        angle = least_dense(s)
+        turn(TURN_GAIN * math.radians(angle))
+    else:
+        turn(TURN_GAIN * math.radians(angle))
+    craft.plot("heading_deg", angle)
+"""#
+    static let l8Starter = #"""
+import craft
+import math
+
+CRUISE_ALT = 80.0
+CRUISE_SPEED = 30.0
+ALPHA_MAX = 0.17         # rad, 10 deg below the 15 deg stall
+MAX_TURN = 0.33          # rad/s heading rate, 45 deg bank at 30 m/s
+
+def wrap(a):
+    while a > math.pi:
+        a = a - 2.0 * math.pi
+    while a < -math.pi:
+        a = a + 2.0 * math.pi
+    return a
+
+trim = {"i": 0.05}
+
+def hold_altitude(target):
+    pitch, yaw, roll = craft.attitude()
+    vz = craft.velocity()[2]
+    err = target - craft.altitude()
+    # Integral trim removes the steady height error (the wing needs a few degrees of nose-up).
+    trim["i"] = math.clamp(trim["i"] + 0.0004 * err, -0.05, 0.2)
+    want = math.clamp(trim["i"] + 0.03 * err - 0.1 * vz, -0.2, 0.3)
+    # Keep the wing below stall: nose at most ALPHA_MAX above the flight path.
+    v = craft.velocity()
+    gamma = math.atan2(v[2], math.hypot(v[0], v[1]))
+    want = min(want, gamma + ALPHA_MAX)
+    craft.set_pitch(1.5 * (want - pitch))
+
+def hold_speed(target):
+    v = craft.velocity()
+    speed = math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
+    craft.set_throttle(math.clamp(0.4 + 0.15 * (target - speed), 0.0, 1.0))
+
+def turn(rate):
+    craft.set_yaw(math.clamp(rate, -MAX_TURN, MAX_TURN))
+
+def ray(angle_deg):
+    d = craft.lidar(angle_deg)
+    if d < 0.0:
+        return 999.0
+    return d
+
+def front_range():
+    return min(ray(-20.0), ray(-10.0), ray(0.0), ray(10.0), ray(20.0))
+
+# Lesson 8: A* on an occupancy grid built from lidar scans, replanned every second.
+# Pseudocode from stage 2:
+#   mark lidar hits (inflated) in the grid
+#   every REPLAN s: A* from the craft cell toward the goal, stop at HORIZON m
+#   follow the path with a lookahead point
+
+CELL = 10.0
+INFLATE = 0            # cells. Tune this.
+HORIZON = 300.0        # m
+EXPANSIONS_PER_TICK = 120
+REPLAN = 1.0           # s
+LOOKAHEAD = 40.0       # m
+MEMORY = 20.0          # s a marked cell stays blocked
+NEIGHBOURS = [(1, 0, 1.0), (-1, 0, 1.0), (0, 1, 1.0), (0, -1, 1.0),
+              (1, 1, 1.414), (1, -1, 1.414), (-1, 1, 1.414), (-1, -1, 1.414)]
+
+grid = {}
+plan = {"open": [], "g": {}, "parent": {}, "start": 0, "done": True,
+        "path": [], "t_last": -100.0, "gx": 0.0, "gy": 0.0, "sx": 0.0, "sy": 0.0}
+
+def key(i, j):
+    return (i + 5000) * 100000 + (j + 5000)
+
+def cell_i(k):
+    return k // 100000 - 5000
+
+def cell_j(k):
+    return k % 100000 - 5000
+
+def centre(k):
+    return (cell_i(k) + 0.5) * CELL, (cell_j(k) + 0.5) * CELL
+
+def cell_of(x, y):
+    return int(math.floor(x / CELL)), int(math.floor(y / CELL))
+
+def heap_push(h, item):
+    h.append(item)
+    i = len(h) - 1
+    while i > 0:
+        p = (i - 1) // 2
+        if h[p][0] <= h[i][0]:
+            break
+        t = h[p]
+        h[p] = h[i]
+        h[i] = t
+        i = p
+
+def heap_pop(h):
+    top = h[0]
+    last = h.pop()
+    n = len(h)
+    if n > 0:
+        h[0] = last
+        i = 0
+        while True:
+            c = 2 * i + 1
+            if c >= n:
+                break
+            if c + 1 < n and h[c + 1][0] < h[c][0]:
+                c = c + 1
+            if h[i][0] <= h[c][0]:
+                break
+            t = h[i]
+            h[i] = h[c]
+            h[c] = t
+            i = c
+    return top
+
+def blocked(k):
+    if k in grid:
+        return craft.time() - grid[k] < MEMORY
+    return False
+
+def mark_scan():
+    p = craft.position()
+    pitch, yaw, roll = craft.attitude()
+    now = craft.time()
+    for hit in craft.lidar_scan():
+        a, d = hit
+        if d > 0.0:
+            ang = yaw + math.radians(a)
+            ci, cj = cell_of(p[0] + d * math.sin(ang), p[1] + d * math.cos(ang))
+            for di in range(-INFLATE, INFLATE + 1):
+                for dj in range(-INFLATE, INFLATE + 1):
+                    grid[key(ci + di, cj + dj)] = now
+
+def heuristic(k):
+    x, y = centre(k)
+    return math.hypot(x - plan["gx"], y - plan["gy"])
+
+def start_plan():
+    p = craft.position()
+    i, j = cell_of(p[0], p[1])
+    s = key(i, j)
+    plan["sx"] = p[0]
+    plan["sy"] = p[1]
+    plan["open"] = []
+    plan["g"] = {s: 0.0}
+    plan["parent"] = {s: -1}
+    plan["start"] = s
+    plan["done"] = False
+    heap_push(plan["open"], (heuristic(s), s))
+
+def extract(k):
+    path = []
+    while k != -1:
+        path.insert(0, k)
+        k = plan["parent"][k]
+    return path
+
+def step_plan():
+    # TODO: run up to EXPANSIONS_PER_TICK A* expansions.
+    # Finish when the popped cell is within CELL of the goal or HORIZON from the start:
+    # set plan["path"] = extract(k) and plan["done"] = True.
+    plan["done"] = True
+
+def follow_path():
+    p = craft.position()
+    pitch, yaw, roll = craft.attitude()
+    for k in plan["path"]:
+        x, y = centre(k)
+        if math.hypot(x - p[0], y - p[1]) > LOOKAHEAD:
+            turn(0.8 * wrap(math.atan2(x - p[0], y - p[1]) - yaw))
+            return
+    gb, ge, gd = craft.goal()
+    turn(0.8 * gb)
+
+def setup():
+    g = craft.goal_position()
+    plan["gx"] = g[0]
+    plan["gy"] = g[1]
+
+def update(dt):
+    hold_altitude(CRUISE_ALT)
+    hold_speed(CRUISE_SPEED)
+    if int(craft.time() / dt) % 5 == 0:
+        mark_scan()
+    if plan["done"] and craft.time() - plan["t_last"] >= REPLAN:
+        start_plan()
+        plan["t_last"] = craft.time()
+    if not plan["done"]:
+        step_plan()
+    follow_path()
+    craft.plot("path_cells", len(plan["path"]))
+"""#
+    static let l8Reference = #"""
+import craft
+import math
+
+CRUISE_ALT = 80.0
+CRUISE_SPEED = 30.0
+ALPHA_MAX = 0.17         # rad, 10 deg below the 15 deg stall
+MAX_TURN = 0.33          # rad/s heading rate, 45 deg bank at 30 m/s
+
+def wrap(a):
+    while a > math.pi:
+        a = a - 2.0 * math.pi
+    while a < -math.pi:
+        a = a + 2.0 * math.pi
+    return a
+
+trim = {"i": 0.05}
+
+def hold_altitude(target):
+    pitch, yaw, roll = craft.attitude()
+    vz = craft.velocity()[2]
+    err = target - craft.altitude()
+    # Integral trim removes the steady height error (the wing needs a few degrees of nose-up).
+    trim["i"] = math.clamp(trim["i"] + 0.0004 * err, -0.05, 0.2)
+    want = math.clamp(trim["i"] + 0.03 * err - 0.1 * vz, -0.2, 0.3)
+    # Keep the wing below stall: nose at most ALPHA_MAX above the flight path.
+    v = craft.velocity()
+    gamma = math.atan2(v[2], math.hypot(v[0], v[1]))
+    want = min(want, gamma + ALPHA_MAX)
+    craft.set_pitch(1.5 * (want - pitch))
+
+def hold_speed(target):
+    v = craft.velocity()
+    speed = math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
+    craft.set_throttle(math.clamp(0.4 + 0.15 * (target - speed), 0.0, 1.0))
+
+def turn(rate):
+    craft.set_yaw(math.clamp(rate, -MAX_TURN, MAX_TURN))
+
+def ray(angle_deg):
+    d = craft.lidar(angle_deg)
+    if d < 0.0:
+        return 999.0
+    return d
+
+def front_range():
+    return min(ray(-20.0), ray(-10.0), ray(0.0), ray(10.0), ray(20.0))
+
+# Lesson 8: A* on an occupancy grid built from lidar scans, replanned every second.
+# Pseudocode from stage 2:
+#   mark lidar hits (inflated) in the grid
+#   every REPLAN s: A* from the craft cell toward the goal, stop at HORIZON m
+#   follow the path with a lookahead point
+
+CELL = 10.0
+INFLATE = 2
+MARGIN = 1             # cells of soft margin around blocked cells
+NEAR_COST = 3.0        # extra cost per cell inside the margin
+HORIZON = 250.0        # m
+EXPANSIONS_PER_TICK = 120
+REPLAN = 0.5           # s
+LOOKAHEAD = 30.0       # m
+GUARD = 60.0           # m, local safety check on the planned heading
+TURN_GAIN = 1.2
+MEMORY = 20.0          # s a marked cell stays blocked
+NEIGHBOURS = [(1, 0, 1.0), (-1, 0, 1.0), (0, 1, 1.0), (0, -1, 1.0),
+              (1, 1, 1.414), (1, -1, 1.414), (-1, 1, 1.414), (-1, -1, 1.414)]
+
+grid = {}
+near = {}
+plan = {"open": [], "g": {}, "parent": {}, "start": 0, "done": True,
+        "path": [], "t_last": -100.0, "gx": 0.0, "gy": 0.0, "sx": 0.0, "sy": 0.0}
+
+def key(i, j):
+    return (i + 5000) * 100000 + (j + 5000)
+
+def cell_i(k):
+    return k // 100000 - 5000
+
+def cell_j(k):
+    return k % 100000 - 5000
+
+def centre(k):
+    return (cell_i(k) + 0.5) * CELL, (cell_j(k) + 0.5) * CELL
+
+def cell_of(x, y):
+    return int(math.floor(x / CELL)), int(math.floor(y / CELL))
+
+def heap_push(h, item):
+    h.append(item)
+    i = len(h) - 1
+    while i > 0:
+        p = (i - 1) // 2
+        if h[p][0] <= h[i][0]:
+            break
+        t = h[p]
+        h[p] = h[i]
+        h[i] = t
+        i = p
+
+def heap_pop(h):
+    top = h[0]
+    last = h.pop()
+    n = len(h)
+    if n > 0:
+        h[0] = last
+        i = 0
+        while True:
+            c = 2 * i + 1
+            if c >= n:
+                break
+            if c + 1 < n and h[c + 1][0] < h[c][0]:
+                c = c + 1
+            if h[i][0] <= h[c][0]:
+                break
+            t = h[i]
+            h[i] = h[c]
+            h[c] = t
+            i = c
+    return top
+
+def blocked(k):
+    if k in grid:
+        return craft.time() - grid[k] < MEMORY
+    return False
+
+def mark_scan():
+    p = craft.position()
+    pitch, yaw, roll = craft.attitude()
+    now = craft.time()
+    for hit in craft.lidar_scan():
+        a, d = hit
+        if d > 0.0:
+            ang = yaw + math.radians(a)
+            ci, cj = cell_of(p[0] + d * math.sin(ang), p[1] + d * math.cos(ang))
+            for di in range(-INFLATE, INFLATE + 1):
+                for dj in range(-INFLATE, INFLATE + 1):
+                    grid[key(ci + di, cj + dj)] = now
+            for di in range(-INFLATE - MARGIN, INFLATE + MARGIN + 1):
+                for dj in range(-INFLATE - MARGIN, INFLATE + MARGIN + 1):
+                    near[key(ci + di, cj + dj)] = now
+
+def heuristic(k):
+    x, y = centre(k)
+    return math.hypot(x - plan["gx"], y - plan["gy"])
+
+def start_plan():
+    p = craft.position()
+    i, j = cell_of(p[0], p[1])
+    s = key(i, j)
+    plan["sx"] = p[0]
+    plan["sy"] = p[1]
+    plan["open"] = []
+    plan["g"] = {s: 0.0}
+    plan["parent"] = {s: -1}
+    plan["start"] = s
+    plan["done"] = False
+    heap_push(plan["open"], (heuristic(s), s))
+
+def extract(k):
+    path = []
+    while k != -1:
+        path.insert(0, k)
+        k = plan["parent"][k]
+    return path
+
+def step_plan():
+    n = 0
+    while n < EXPANSIONS_PER_TICK and len(plan["open"]) > 0:
+        item = heap_pop(plan["open"])
+        f = item[0]
+        k = item[1]
+        gk = plan["g"][k]
+        if f > gk + heuristic(k) + 0.001:
+            continue
+        n = n + 1
+        x, y = centre(k)
+        if heuristic(k) < CELL or math.hypot(x - plan["sx"], y - plan["sy"]) >= HORIZON:
+            plan["path"] = extract(k)
+            plan["done"] = True
+            return
+        i = cell_i(k)
+        j = cell_j(k)
+        for nb in NEIGHBOURS:
+            nk = key(i + nb[0], j + nb[1])
+            if blocked(nk):
+                continue
+            ng = gk + nb[2] * CELL
+            if nk in near and craft.time() - near[nk] < MEMORY:
+                ng = ng + NEAR_COST * CELL
+            if not (nk in plan["g"]) or ng < plan["g"][nk]:
+                plan["g"][nk] = ng
+                plan["parent"][nk] = k
+                heap_push(plan["open"], (ng + heuristic(nk), nk))
+    if len(plan["open"]) == 0:
+        plan["done"] = True
+def clear_heading(want):
+    # Local check on the planned heading (rad, relative to the nose): if the lidar sees
+    # something within GUARD m in a 30 deg fan around it, take the nearest clear ray instead.
+    scan = craft.lidar_scan()
+    best = want
+    best_cost = 1.0e9
+    for hit in scan:
+        a = math.radians(hit[0])
+        if abs(a) > math.pi / 2.0:
+            continue
+        ok = True
+        for other in scan:
+            if other[1] > 0.0 and other[1] < GUARD and abs(wrap(math.radians(other[0]) - a)) <= math.radians(15.0):
+                ok = False
+        if ok:
+            cost = abs(wrap(a - want))
+            if cost < best_cost:
+                best_cost = cost
+                best = a
+    return best
+
+def follow_path():
+    p = craft.position()
+    pitch, yaw, roll = craft.attitude()
+    want = None
+    for k in plan["path"]:
+        x, y = centre(k)
+        if math.hypot(x - p[0], y - p[1]) > LOOKAHEAD:
+            want = wrap(math.atan2(x - p[0], y - p[1]) - yaw)
+            break
+    if want is None:
+        gb, ge, gd = craft.goal()
+        want = gb
+    turn(TURN_GAIN * clear_heading(want))
+
+def setup():
+    g = craft.goal_position()
+    plan["gx"] = g[0]
+    plan["gy"] = g[1]
+
+def update(dt):
+    hold_altitude(CRUISE_ALT)
+    hold_speed(CRUISE_SPEED)
+    if int(craft.time() / dt) % 5 == 0:
+        mark_scan()
+    else:
+        # Planning runs on the other ticks so marking and searching never share a tick's budget.
+        if plan["done"] and craft.time() - plan["t_last"] >= REPLAN:
+            start_plan()
+            plan["t_last"] = craft.time()
+        if not plan["done"]:
+            step_plan()
+    follow_path()
+    craft.plot("path_cells", len(plan["path"]))
+"""#
+    static let l10Starter = #"""
+import craft
+import math
+
+CRUISE_ALT = 80.0
+CRUISE_SPEED = 30.0
+ALPHA_MAX = 0.17         # rad, 10 deg below the 15 deg stall
+MAX_TURN = 0.33          # rad/s heading rate, 45 deg bank at 30 m/s
+
+def wrap(a):
+    while a > math.pi:
+        a = a - 2.0 * math.pi
+    while a < -math.pi:
+        a = a + 2.0 * math.pi
+    return a
+
+trim = {"i": 0.05}
+
+def hold_altitude(target):
+    pitch, yaw, roll = craft.attitude()
+    vz = craft.velocity()[2]
+    err = target - craft.altitude()
+    # Integral trim removes the steady height error (the wing needs a few degrees of nose-up).
+    trim["i"] = math.clamp(trim["i"] + 0.0004 * err, -0.05, 0.2)
+    want = math.clamp(trim["i"] + 0.03 * err - 0.1 * vz, -0.2, 0.3)
+    # Keep the wing below stall: nose at most ALPHA_MAX above the flight path.
+    v = craft.velocity()
+    gamma = math.atan2(v[2], math.hypot(v[0], v[1]))
+    want = min(want, gamma + ALPHA_MAX)
+    craft.set_pitch(1.5 * (want - pitch))
+
+def hold_speed(target):
+    v = craft.velocity()
+    speed = math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
+    craft.set_throttle(math.clamp(0.4 + 0.15 * (target - speed), 0.0, 1.0))
+
+def turn(rate):
+    craft.set_yaw(math.clamp(rate, -MAX_TURN, MAX_TURN))
+
+def ray(angle_deg):
+    d = craft.lidar(angle_deg)
+    if d < 0.0:
+        return 999.0
+    return d
+
+def front_range():
+    return min(ray(-20.0), ray(-10.0), ray(0.0), ray(10.0), ray(20.0))
+
+# Lesson 10: capstone. Pick any algorithm from lessons 3 to 9.
+# Scored on energy and time. The course is new each attempt.
+
+def setup():
+    pass
+
+def update(dt):
+    hold_altitude(CRUISE_ALT)
+    hold_speed(CRUISE_SPEED)
+    gb, ge, gd = craft.goal()
+    # TODO: your avoidance algorithm
+    turn(0.8 * gb)
+"""#
+    static let l10Reference = #"""
+import craft
+import math
+
+CRUISE_ALT = 80.0
+CRUISE_SPEED = 30.0
+ALPHA_MAX = 0.17         # rad, 10 deg below the 15 deg stall
+MAX_TURN = 0.33          # rad/s heading rate, 45 deg bank at 30 m/s
+
+def wrap(a):
+    while a > math.pi:
+        a = a - 2.0 * math.pi
+    while a < -math.pi:
+        a = a + 2.0 * math.pi
+    return a
+
+trim = {"i": 0.05}
+
+def hold_altitude(target):
+    pitch, yaw, roll = craft.attitude()
+    vz = craft.velocity()[2]
+    err = target - craft.altitude()
+    # Integral trim removes the steady height error (the wing needs a few degrees of nose-up).
+    trim["i"] = math.clamp(trim["i"] + 0.0004 * err, -0.05, 0.2)
+    want = math.clamp(trim["i"] + 0.03 * err - 0.1 * vz, -0.2, 0.3)
+    # Keep the wing below stall: nose at most ALPHA_MAX above the flight path.
+    v = craft.velocity()
+    gamma = math.atan2(v[2], math.hypot(v[0], v[1]))
+    want = min(want, gamma + ALPHA_MAX)
+    craft.set_pitch(1.5 * (want - pitch))
+
+def hold_speed(target):
+    v = craft.velocity()
+    speed = math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
+    craft.set_throttle(math.clamp(0.4 + 0.15 * (target - speed), 0.0, 1.0))
+
+def turn(rate):
+    craft.set_yaw(math.clamp(rate, -MAX_TURN, MAX_TURN))
+
+def ray(angle_deg):
+    d = craft.lidar(angle_deg)
+    if d < 0.0:
+        return 999.0
+    return d
+
+def front_range():
+    return min(ray(-20.0), ray(-10.0), ray(0.0), ray(10.0), ray(20.0))
+
+# Lesson 10 reference: the lesson 6 vector field histogram, holding the finish gate's height.
+# Pseudocode from stage 2:
+#   build a 36-sector polar histogram of obstacle density from the lidar scan
+#   smooth it, mark sectors below THRESHOLD as free
+#   pick the free sector closest to the goal direction, with free neighbours
+#   steer toward that sector
+
+THRESHOLD = 0.8
+VALLEY = 1            # free neighbours needed each side
+W_GOAL = 1.0
+WIDE = 3              # sectors kept between the path and a valley edge
+W_HEADING = 0.5
+W_PREV = 1.0
+
+vfh = {"prev": -999.0, "prev_abs": -999.0}
+TURN_GAIN = 1.5
+MAX_RANGE = 120.0
+R_SAFE = 10.0         # m, craft half span plus margin
+
+def histogram():
+    h = []
+    for k in range(36):
+        h.append(0.0)
+    for hit in craft.lidar_scan():
+        a, d = hit
+        if d > 0.0 and d < MAX_RANGE:
+            w = 1.0 - d / MAX_RANGE
+            # Enlarge each hit by the safety radius seen from the craft (VFH+).
+            spread = math.degrees(math.asin(min(1.0, R_SAFE / d)))
+            k0 = int(math.floor((a - spread + 180.0) / 10.0))
+            k1 = int(math.floor((a + spread + 180.0) / 10.0))
+            for k in range(k0, k1 + 1):
+                h[(k + 36) % 36] = h[(k + 36) % 36] + w * w
+    return h
+
+def smooth(h):
+    s = []
+    for k in range(36):
+        s.append((h[(k + 35) % 36] + 2.0 * h[k] + h[(k + 1) % 36]) / 4.0)
+    return s
+
+def pick_sector(s, goal_deg):
+    # Valleys: runs of free sectors within 90 deg of the nose. In a wide valley aim WIDE sectors
+    # in from the edge nearest the goal (or at the goal if it lies inside); in a narrow one, its middle.
+    best = None
+    best_cost = 1.0e9
+    k = 9
+    while k <= 26:
+        if s[k] >= THRESHOLD:
+            k = k + 1
+            continue
+        start = k
+        while k <= 26 and s[k] < THRESHOLD:
+            k = k + 1
+        stop = k - 1
+        lo = start * 10.0 - 180.0 + 5.0
+        hi = stop * 10.0 - 180.0 + 5.0
+        if stop - start + 1 < 2 * VALLEY + 1:
+            continue
+        if stop - start + 1 >= 2 * WIDE:
+            a_lo = lo + (WIDE - 1) * 10.0
+            a_hi = hi - (WIDE - 1) * 10.0
+            target = min(max(goal_deg, a_lo), a_hi)
+        else:
+            target = (lo + hi) / 2.0
+        cost = W_GOAL * abs(target - goal_deg) + W_HEADING * abs(target)
+        if vfh["prev"] > -900.0:
+            # Hysteresis: stay with the valley picked last tick instead of flipping sides.
+            cost = cost + W_PREV * abs(math.degrees(wrap(math.radians(target - vfh["prev"]))))
+        if cost < best_cost:
+            best_cost = cost
+            best = target
+    return best
+
+def least_dense(s):
+    # Fallback when nothing is free: the emptiest sector ahead.
+    best = 0.0
+    low = 1.0e9
+    for k in range(36):
+        centre = k * 10.0 - 180.0 + 5.0
+        if abs(centre) <= 90.0 and s[k] < low:
+            low = s[k]
+            best = centre
+    return best
+
+cfg = {"alt": CRUISE_ALT}
+
+def setup():
+    cfg["alt"] = craft.goal_position()[2]
+
+def update(dt):
+    hold_altitude(cfg["alt"])
+    hold_speed(CRUISE_SPEED)
+    gb, ge, gd = craft.goal()
+    s = smooth(histogram())
+    pitch, yaw, roll = craft.attitude()
+    if vfh["prev_abs"] > -900.0:
+        vfh["prev"] = math.degrees(wrap(math.radians(vfh["prev_abs"]) - yaw))
+    angle = pick_sector(s, math.degrees(gb))
+    if angle is not None:
+        vfh["prev_abs"] = math.degrees(yaw) + angle
+    if angle is None:
+        angle = least_dense(s)
+        turn(TURN_GAIN * math.radians(angle))
+    else:
+        turn(TURN_GAIN * math.radians(angle))
+    craft.plot("heading_deg", angle)
+"""#
 }

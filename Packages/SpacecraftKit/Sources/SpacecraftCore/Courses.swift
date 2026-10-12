@@ -322,7 +322,7 @@ public enum CourseGenerator {
             for k in 0..<walls {
                 y += r.range(300, 450)
                 if y > length - 150 { break }
-                let len = r.range(120, 240)
+                let len = r.range(120, 150)   // specs/15 caps field walls at 150 m (L6 reference turn radius)
                 let off = side * r.range(20, 60)
                 obstacles.append(.wall("W\(k + 1)", x: off, y: y, length: len, height: 250, thickness: 3))
                 wallSpans.append((off - len / 2, off + len / 2, y))

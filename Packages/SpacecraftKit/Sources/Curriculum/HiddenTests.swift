@@ -19,6 +19,34 @@ public enum HiddenTests {
 
     static func near(_ a: Double?, _ b: Double, _ tol: Double = 1e-6) -> Bool { a.map { abs($0 - b) <= tol } ?? false }
 
+
+    static func scan(_ hits: [(Double, Double)]) -> Value {
+        .list(ListRef(stride(from: -180, to: 180, by: 10).map { a in
+            let d = hits.first { $0.0 == Double(a) }?.1 ?? -1
+            return .tuple([.float(Double(a)), .float(d)])
+        }))
+    }
+
+    /// 36 smoothed sector values from a rule on the sector index.
+    static func sectors(_ f: (Int) -> Double) -> Value { .list(ListRef((0..<36).map { .float(f($0)) })) }
+
+    static func gridKey(_ i: Int, _ j: Int) -> Int { (i + 5000) * 100000 + (j + 5000) }
+
+    /// Plans from (0, 0) to (5, 95) with the given grid keys blocked; nil if planning faults or never finishes.
+    static func plan(_ h: UnitHarness, blocked: [Int]) -> [Int]? {
+        h.values["goal_position"] = .vec(5, 95, 80)
+        guard h.call("setup") != nil, case let .dict(g)? = h.vm.global("grid") else { return nil }
+        for k in blocked { g.set(.int(k), key: .int(k), .float(0)) }
+        guard h.call("start_plan") != nil else { return nil }
+        for _ in 0..<50 {
+            guard h.call("step_plan") != nil else { return nil }
+            if case .bool(true)? = h.entry("plan", "done") { break }
+        }
+        guard case .bool(true)? = h.entry("plan", "done") else { return nil }
+        let p = h.entry("plan", "path")?.items.compactMap { v -> Int? in if case let .int(i) = v { i } else { nil } } ?? []
+        return p.isEmpty ? nil : p
+    }
+
     nonisolated(unsafe) static let suites: [Int: [Case]] = [
         2: [
             ("test_p_term_only", { h in
@@ -149,6 +177,74 @@ public enum HiddenTests {
                 h.values["time"] = .float(20)
                 h.call("force")
                 return (h.entry("pf", "escape_until")?.number ?? -1) > 20
+            }),
+        ],
+        6: [
+            ("test_histogram_bins", { h in
+                h.values["lidar_scan"] = scan([(0, 60)])
+                let bins = h.call("histogram")?.items.compactMap(\.number) ?? []
+                return bins.count == 36 && near(bins[18], 0.25, 1e-6) && bins[0] == 0 && bins[9] == 0
+            }),
+            ("test_smooth_wraps", { h in
+                var bins = [Value](repeating: .float(0), count: 36); bins[0] = .float(4)
+                let s = h.call("smooth", [.list(ListRef(bins))])?.items.compactMap(\.number) ?? []
+                return s.count == 36 && near(s[0], 2) && near(s[35], 1) && near(s[1], 1)
+            }),
+            ("test_pick_closest_to_goal", { h in
+                let a = h.call("pick_sector", [sectors { _ in 0 }, .float(30)])?.number
+                return near(a, 30, 0.5)
+            }),
+            ("test_pick_requires_wide_valley", { h in
+                let narrow = h.call("pick_sector", [sectors { $0 == 18 || $0 == 19 ? 0 : 5 }, .float(0)])
+                let wide = h.call("pick_sector", [sectors { (17...19).contains($0) ? 0 : 5 }, .float(0)])?.number
+                if case .none? = narrow { return near(wide, 5, 0.5) }
+                return false
+            }),
+            ("test_none_when_blocked", { h in
+                if case .none? = h.call("pick_sector", [sectors { _ in 5 }, .float(0)]) { return true }
+                return false
+            }),
+        ],
+        8: [
+            ("test_heap_order", { h in
+                let heap = Value.list(ListRef([]))
+                for (f, k) in [(5.0, 1), (1.0, 2), (3.0, 3), (4.0, 4)] {
+                    h.call("heap_push", [heap, .tuple([.float(f), .int(k)])])
+                }
+                let out = (0..<4).compactMap { _ in h.call("heap_pop", [heap])?.items.first?.number }
+                return out == [1, 3, 4, 5]
+            }),
+            ("test_astar_straight_line", { h in
+                guard let path = plan(h, blocked: []) else { return false }
+                return path.count == 10 && path.allSatisfy { h.call("cell_i", [.int($0)])?.number == 0 }
+            }),
+            ("test_astar_around_block", { h in
+                let wall = (-1...1).map { gridKey($0, 4) }
+                guard let path = plan(h, blocked: wall), let last = path.last else { return false }
+                let hd = h.call("heuristic", [.int(last)])?.number ?? 99
+                return path.allSatisfy { !wall.contains($0) } && hd < 10
+            }),
+            ("test_inflate_marks_square", { h in
+                h.vm.setGlobal("INFLATE", .int(1))
+                h.values["lidar_scan"] = scan([(0, 55)])
+                h.values["attitude"] = .vec(0, 0, 0)
+                h.call("mark_scan")
+                guard case let .dict(g)? = h.vm.global("grid") else { return false }
+                let want = Set((-1...1).flatMap { i in (4...6).map { gridKey(i, $0) } })
+                let got = Set(g.order.compactMap { k -> Int? in if case let .int(v) = k { v } else { nil } })
+                return got == want
+            }),
+            ("test_budget_per_tick", { h in
+                h.values["goal_position"] = .vec(0, 2400, 80)
+                h.values["goal"] = .vec(0, 0, 2400)
+                h.values["attitude"] = .vec(0, 0, 0)
+                h.values["lidar_scan"] = scan([(-30, 40), (-20, 45), (0, 70), (20, 50), (40, 35), (90, 30), (-90, 30)])
+                h.call("setup")
+                for t in 0..<100 {
+                    h.values["time"] = .float(Double(t) * 0.02)
+                    if h.call("update", [.float(0.02)]) == nil { return false }
+                }
+                return true
             }),
         ],
         7: [

@@ -754,10 +754,24 @@ public final class FlightSimulation {
         return d + sensorRNG.gaussian() * 0.03
     }
 
-    /// 36 rays from -180 to 170 degrees.
+    private var scanCache: (tick: Int, rays: [(Double, Double)])?
+
+    /// 36 sectors from -180 to 170 degrees, refreshed at 10 Hz. Each value is the nearest return of five
+    /// sub-rays across its 10 deg sector (-1 when none returns), so thin obstacles between sector centres show.
     public func lidarScan() -> [(Double, Double)] {
-        guard partIds.contains("lidar-sensor") else { return [] }
-        return stride(from: -180, to: 180, by: 10).map { a in (Double(a), lidar(angleDeg: Double(a))) }
+        guard partIds.contains("lidar-sensor"), !energyDepleted else { return [] }
+        if let c = scanCache, tick - c.tick < Int(Self.physicsRate / 10) { return c.rays }
+        var rays: [(Double, Double)] = []
+        for a in stride(from: -180, to: 180, by: 10) {
+            var best = -1.0
+            for sub in [-4.0, -2.0, 0.0, 2.0, 4.0] {
+                let d = lidar(angleDeg: Double(a) + sub)
+                if d > 0 && (best < 0 || d < best) { best = d }
+            }
+            rays.append((Double(a), best))
+        }
+        scanCache = (tick, rays)
+        return rays
     }
 
     /// Nose-axis frame: forward, right, up.
