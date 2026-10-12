@@ -1,0 +1,986 @@
+[
+  {
+    "duration" : 8,
+    "path" : "analysis",
+    "summary" : "Analysis window for the selected lesson's preview",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "code",
+    "summary" : "Code editor window",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "home\/learn",
+    "summary" : "Home, learn tab",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "home\/missions",
+    "summary" : "Home, missions tab",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "home\/settings",
+    "summary" : "Settings screen",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "home\/workshop",
+    "summary" : "Home, workshop tab",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/0\/analyze",
+    "summary" : "Lesson 0 Test and analyze",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/0\/concept",
+    "summary" : "Lesson 0 Concept",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/0\/implement",
+    "summary" : "Lesson 0 Implement",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/0\/pseudocode",
+    "summary" : "Lesson 0 Pseudocode",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/0\/run",
+    "summary" : "Lesson 0 Run",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/1\/analyze",
+    "summary" : "Lesson 1 Test and analyze",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/1\/concept",
+    "summary" : "Lesson 1 Concept",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/1\/implement",
+    "summary" : "Lesson 1 Implement",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/1\/pseudocode",
+    "summary" : "Lesson 1 Pseudocode",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/1\/run",
+    "summary" : "Lesson 1 Run",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/10\/analyze",
+    "summary" : "Lesson 10 Test and analyze",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/10\/concept",
+    "summary" : "Lesson 10 Concept",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/10\/implement",
+    "summary" : "Lesson 10 Implement",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/10\/pseudocode",
+    "summary" : "Lesson 10 Pseudocode",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/10\/run",
+    "summary" : "Lesson 10 Run",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/2\/analyze",
+    "summary" : "Lesson 2 Test and analyze",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/2\/concept",
+    "summary" : "Lesson 2 Concept",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/2\/implement",
+    "summary" : "Lesson 2 Implement",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/2\/pseudocode",
+    "summary" : "Lesson 2 Pseudocode",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/2\/run",
+    "summary" : "Lesson 2 Run",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/3\/analyze",
+    "summary" : "Lesson 3 Test and analyze",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/3\/concept",
+    "summary" : "Lesson 3 Concept",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/3\/implement",
+    "summary" : "Lesson 3 Implement",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/3\/pseudocode",
+    "summary" : "Lesson 3 Pseudocode",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/3\/run",
+    "summary" : "Lesson 3 Run",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/4\/analyze",
+    "summary" : "Lesson 4 Test and analyze",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/4\/concept",
+    "summary" : "Lesson 4 Concept",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/4\/implement",
+    "summary" : "Lesson 4 Implement",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/4\/pseudocode",
+    "summary" : "Lesson 4 Pseudocode",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/4\/run",
+    "summary" : "Lesson 4 Run",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/5\/analyze",
+    "summary" : "Lesson 5 Test and analyze",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/5\/concept",
+    "summary" : "Lesson 5 Concept",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/5\/implement",
+    "summary" : "Lesson 5 Implement",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/5\/pseudocode",
+    "summary" : "Lesson 5 Pseudocode",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/5\/run",
+    "summary" : "Lesson 5 Run",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/6\/analyze",
+    "summary" : "Lesson 6 Test and analyze",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/6\/concept",
+    "summary" : "Lesson 6 Concept",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/6\/implement",
+    "summary" : "Lesson 6 Implement",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/6\/pseudocode",
+    "summary" : "Lesson 6 Pseudocode",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/6\/run",
+    "summary" : "Lesson 6 Run",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/7\/analyze",
+    "summary" : "Lesson 7 Test and analyze",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/7\/concept",
+    "summary" : "Lesson 7 Concept",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/7\/implement",
+    "summary" : "Lesson 7 Implement",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/7\/pseudocode",
+    "summary" : "Lesson 7 Pseudocode",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/7\/run",
+    "summary" : "Lesson 7 Run",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/8\/analyze",
+    "summary" : "Lesson 8 Test and analyze",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/8\/concept",
+    "summary" : "Lesson 8 Concept",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/8\/implement",
+    "summary" : "Lesson 8 Implement",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/8\/pseudocode",
+    "summary" : "Lesson 8 Pseudocode",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/8\/run",
+    "summary" : "Lesson 8 Run",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/9\/analyze",
+    "summary" : "Lesson 9 Test and analyze",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/9\/concept",
+    "summary" : "Lesson 9 Concept",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/9\/implement",
+    "summary" : "Lesson 9 Implement",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/9\/pseudocode",
+    "summary" : "Lesson 9 Pseudocode",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "lesson\/9\/run",
+    "summary" : "Lesson 9 Run",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c1\/chase",
+    "summary" : "Predictive hop course, Chase view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c1\/chase\/fly",
+    "summary" : "Predictive hop flown with the lesson reference, Chase view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c1\/ground",
+    "summary" : "Predictive hop course, Ground view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c1\/ground\/fly",
+    "summary" : "Predictive hop flown with the lesson reference, Ground view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c1\/tabletop",
+    "summary" : "Predictive hop course, Tabletop view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c1\/tabletop\/fly",
+    "summary" : "Predictive hop flown with the lesson reference, Tabletop view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c1w\/chase",
+    "summary" : "Hop in wind course, Chase view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c1w\/chase\/fly",
+    "summary" : "Hop in wind flown with the lesson reference, Chase view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c1w\/ground",
+    "summary" : "Hop in wind course, Ground view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c1w\/ground\/fly",
+    "summary" : "Hop in wind flown with the lesson reference, Ground view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c1w\/tabletop",
+    "summary" : "Hop in wind course, Tabletop view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c1w\/tabletop\/fly",
+    "summary" : "Hop in wind flown with the lesson reference, Tabletop view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c2\/chase",
+    "summary" : "Gates course, Chase view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c2\/chase\/fly",
+    "summary" : "Gates flown with the lesson reference, Chase view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c2\/ground",
+    "summary" : "Gates course, Ground view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c2\/ground\/fly",
+    "summary" : "Gates flown with the lesson reference, Ground view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c2\/tabletop",
+    "summary" : "Gates course, Tabletop view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c2\/tabletop\/fly",
+    "summary" : "Gates flown with the lesson reference, Tabletop view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c2b\/chase",
+    "summary" : "Gates and walls course, Chase view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c2b\/chase\/fly",
+    "summary" : "Gates and walls flown with the lesson reference, Chase view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c2b\/ground",
+    "summary" : "Gates and walls course, Ground view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c2b\/ground\/fly",
+    "summary" : "Gates and walls flown with the lesson reference, Ground view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c2b\/tabletop",
+    "summary" : "Gates and walls course, Tabletop view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c2b\/tabletop\/fly",
+    "summary" : "Gates and walls flown with the lesson reference, Tabletop view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c3\/chase",
+    "summary" : "Drift course, Chase view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c3\/chase\/fly",
+    "summary" : "Drift flown with the lesson reference, Chase view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c3\/ground",
+    "summary" : "Drift course, Ground view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c3\/ground\/fly",
+    "summary" : "Drift flown with the lesson reference, Ground view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c3\/tabletop",
+    "summary" : "Drift course, Tabletop view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c3\/tabletop\/fly",
+    "summary" : "Drift flown with the lesson reference, Tabletop view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c4\/chase",
+    "summary" : "Field course, Chase view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c4\/chase\/fly",
+    "summary" : "Field flown with the lesson reference, Chase view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c4\/ground",
+    "summary" : "Field course, Ground view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c4\/ground\/fly",
+    "summary" : "Field flown with the lesson reference, Ground view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c4\/tabletop",
+    "summary" : "Field course, Tabletop view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c4\/tabletop\/fly",
+    "summary" : "Field flown with the lesson reference, Tabletop view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c5\/chase",
+    "summary" : "Canyon course, Chase view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c5\/chase\/fly",
+    "summary" : "Canyon flown with the lesson reference, Chase view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c5\/ground",
+    "summary" : "Canyon course, Ground view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c5\/ground\/fly",
+    "summary" : "Canyon flown with the lesson reference, Ground view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c5\/tabletop",
+    "summary" : "Canyon course, Tabletop view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c5\/tabletop\/fly",
+    "summary" : "Canyon flown with the lesson reference, Tabletop view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c6\/chase",
+    "summary" : "Debris course, Chase view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c6\/chase\/fly",
+    "summary" : "Debris flown with the lesson reference, Chase view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c6\/ground",
+    "summary" : "Debris course, Ground view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c6\/ground\/fly",
+    "summary" : "Debris flown with the lesson reference, Ground view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c6\/tabletop",
+    "summary" : "Debris course, Tabletop view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c6\/tabletop\/fly",
+    "summary" : "Debris flown with the lesson reference, Tabletop view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c7-2\/chase",
+    "summary" : "Capstone course, Chase view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c7-2\/chase\/fly",
+    "summary" : "Capstone flown with the lesson reference, Chase view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c7-2\/ground",
+    "summary" : "Capstone course, Ground view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c7-2\/ground\/fly",
+    "summary" : "Capstone flown with the lesson reference, Ground view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c7-2\/tabletop",
+    "summary" : "Capstone course, Tabletop view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c7-2\/tabletop\/fly",
+    "summary" : "Capstone flown with the lesson reference, Tabletop view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c7-3\/chase",
+    "summary" : "Capstone course, Chase view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c7-3\/chase\/fly",
+    "summary" : "Capstone flown with the lesson reference, Chase view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c7-3\/ground",
+    "summary" : "Capstone course, Ground view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c7-3\/ground\/fly",
+    "summary" : "Capstone flown with the lesson reference, Ground view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "range\/c7-3\/tabletop",
+    "summary" : "Capstone course, Tabletop view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 40,
+    "path" : "range\/c7-3\/tabletop\/fly",
+    "summary" : "Capstone flown with the lesson reference, Tabletop view",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 10,
+    "path" : "workshop\/hangar",
+    "summary" : "Hangar with the current craft",
+    "tags" : [
+
+    ]
+  },
+  {
+    "duration" : 6,
+    "path" : "workshop\/parts",
+    "summary" : "Part picker window",
+    "tags" : [
+
+    ]
+  }
+]

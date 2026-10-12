@@ -13,6 +13,8 @@ enum DemoRoutes {
         func openRange(_ take: Take) async {
             await take.openImmersive(SpaceID.range.rawValue)
             m.openSpace = .range
+            // Stills and demo takes frame the scene: hide the home window unless `window=1`.
+            if take.param("window") != "1" { take.dismissWindow(WindowID.main) }
         }
         b.group("home") { b in
             for mode in GameMode.allCases {
@@ -29,6 +31,7 @@ enum DemoRoutes {
         b.group("workshop") { b in
             b.route("hangar", "Hangar with the current craft", duration: 10) { take in
                 await take.openImmersive(SpaceID.workshop.rawValue); m.openSpace = .workshop
+                if take.param("window") != "1" { take.dismissWindow(WindowID.main) }
                 await take.wait(6); await take.ready(); await take.wait(6); take.done()
             }
             b.route("parts", "Part picker window", duration: 6) { take in

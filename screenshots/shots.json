@@ -1,0 +1,36 @@
+{
+ "bundleId": "org.dicyaninlabs.visionspacecraft",
+ "scheme": "VisionSpacecraft",
+ "settleSeconds": 2.0,
+ "timeoutSeconds": 240,
+ "shots": [
+  {
+   "id": "02-canyon",
+   "route": "range/c5/chase/fly",
+   "at": 40,
+   "params": {
+    "speed": "1",
+    "seconds": "60"
+   },
+   "caption": "Steer through the canyon"
+  },
+  {
+   "id": "03-hangar",
+   "route": "workshop/hangar",
+   "at": 3,
+   "caption": "Build at full scale"
+  },
+  {
+   "id": "04-code",
+   "route": "code",
+   "at": 2,
+   "caption": "Python or C guidance"
+  },
+  {
+   "id": "05-analysis",
+   "route": "analysis",
+   "at": 3,
+   "caption": "Plot every flight"
+  }
+ ]
+}
