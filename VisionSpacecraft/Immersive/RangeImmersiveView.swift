@@ -254,6 +254,12 @@ final class RangeScene {
     func buildStatic(course: Course) async {
         if !builtStatic {
             builtStatic = true
+            // Placeholder desert floor shows at once while the RealityHD range streams in.
+            let placeholder = ModelEntity(mesh: .generatePlane(width: 6000, depth: 6000), materials: [PartMeshFactory.paint(0xC2A27A, rough: 0.95)])
+            placeholder.position = [0, -0.02, 0]
+            staticHolder.addChild(placeholder)
+            env?.illuminate(placeholder)
+            await Task.yield()
             // Base environment: RealityHD "aerospace-range" (pad, tower, blockhouse, runway, platform, scrub).
             // Fallback: an outdoor desert floor with placeholder pad props.
             if let range = try? await RealityHD.scene("aerospace-range", seed: 1) {
@@ -262,12 +268,10 @@ final class RangeScene {
                 range.position = [0, -2.15, 0]
                 range.orientation = simd_quatf(angle: atan2(42, 43), axis: [0, 1, 0])
                 Self.removeSunshade(in: range)
+                placeholder.removeFromParent()
                 staticHolder.addChild(range)
             } else {
-                // Desert floor.
-                let ground = ModelEntity(mesh: .generatePlane(width: 6000, depth: 6000), materials: [PartMeshFactory.paint(0xC2A27A, rough: 0.95)])
-                ground.position = [0, -0.02, 0]
-                staticHolder.addChild(ground)
+                // Desert floor: the placeholder stays.
                 staticHolder.addChild(await PartMeshFactory.entity("launch-pad").withPosition([0, -0.6, 0]))
                 staticHolder.addChild(await PartMeshFactory.entity("launch-tower").withPosition([3.2, 0, 0]))
                 staticHolder.addChild(await PartMeshFactory.entity("viewing-platform").withPosition([0, 0, 60]))
@@ -468,45 +472,65 @@ final class RangeScene {
         }
     }
 
-    /// Drops the viewing platform's sunshade (posts above the rail, purlins, canvas): every triangle
-    /// higher than 3.6 m above the platform mesh base.
-    static func removeSunshade(in root: Entity) {
-        var stack = [root]
+    /// Drops the viewing platform sunshade (posts, purlins, canvas): every triangle over the platform at
+    /// scene (-42, 43) reaching 4 m above the local ground, in whatever mesh (batched or not) holds it.
+    static func removeSunshade(in range: Entity) {
+        let centre = SIMD2<Float>(-42, 43), radius: Float = 4.5
+        var models: [ModelEntity] = []
+        var stack = [range]
         while let e = stack.popLast() {
             stack.append(contentsOf: e.children)
-            guard e.name == "viewing-platform" else { continue }
-            var models: [ModelEntity] = []
-            var inner = Array(e.children)
-            while let c = inner.popLast() {
-                inner.append(contentsOf: c.children)
-                if let m = c as? ModelEntity { models.append(m) }
-            }
-            for m in models {
-                guard let mesh = m.model?.mesh else { continue }
-                let cut = mesh.bounds.min.y + 3.6
-                var contents = mesh.contents
-                var models = MeshModelCollection()
-                for model in contents.models {
-                    var parts = MeshPartCollection()
-                    for var part in model.parts {
-                        guard let idx = part.triangleIndices else { parts.insert(part); continue }
-                        let pos = part.positions.elements
-                        var kept: [UInt32] = []
-                        let tri = Array(idx.elements)
-                        for t in stride(from: 0, to: tri.count - 2, by: 3) {
-                            let a = tri[t], b = tri[t + 1], c = tri[t + 2]
-                            if pos[Int(a)].y > cut, pos[Int(b)].y > cut, pos[Int(c)].y > cut { continue }
-                            kept += [a, b, c]
-                        }
-                        if kept.isEmpty { continue }
-                        part.triangleIndices = MeshBuffer(kept)
-                        parts.insert(part)
+            if let m = e as? ModelEntity, m.components[ModelComponent.self] != nil { models.append(m) }
+        }
+        func near(_ p: SIMD3<Float>) -> Bool { simd_length(SIMD2(p.x, p.z) - centre) < radius }
+        // Skip meshes whose range-space bounds miss the platform circle (avoids per-vertex work on the whole scene).
+        models = models.filter { m in
+            let b = m.visualBounds(recursive: false, relativeTo: range)
+            if b.isEmpty { return false }
+            let dx = max(b.min.x - centre.x, 0, centre.x - b.max.x), dz = max(b.min.z - centre.y, 0, centre.y - b.max.z)
+            return dx * dx + dz * dz < radius * radius
+        }
+        func toRange(_ m: ModelEntity) -> simd_float4x4 { range.transformMatrix(relativeTo: nil).inverse * m.transformMatrix(relativeTo: nil) }
+        // Ground estimate: lowest vertex under the platform.
+        var ground = Float.greatestFiniteMagnitude
+        for m in models {
+            guard let mesh = m.model?.mesh else { continue }
+            let t = toRange(m)
+            for model in mesh.contents.models { for part in model.parts { for v in part.positions.elements {
+                let p = (t * SIMD4(v, 1)).xyz
+                if near(p) { ground = min(ground, p.y) }
+            }}}
+        }
+        guard ground < .greatestFiniteMagnitude else { return }
+        let cut = ground + 4.0
+        for m in models {
+            guard let mesh = m.model?.mesh else { continue }
+            let t = toRange(m)
+            var contents = mesh.contents
+            var changed = false
+            var newModels = MeshModelCollection()
+            for model in contents.models {
+                var parts: [MeshResource.Part] = []
+                for var part in model.parts {
+                    guard let idx = part.triangleIndices else { parts.append(part); continue }
+                    let pos = part.positions.elements.map { (t * SIMD4($0, 1)).xyz }
+                    let tri = Array(idx.elements)
+                    var kept: [UInt32] = []
+                    kept.reserveCapacity(tri.count)
+                    for i in stride(from: 0, to: tri.count - 2, by: 3) {
+                        let pa = pos[Int(tri[i])], pb = pos[Int(tri[i + 1])], pc = pos[Int(tri[i + 2])]
+                        if near((pa + pb + pc) / 3), max(pa.y, pb.y, pc.y) > cut { changed = true; continue }
+                        kept += [tri[i], tri[i + 1], tri[i + 2]]
                     }
-                    models.insert(MeshResource.Model(id: model.id, parts: Array(parts)))
+                    if kept.isEmpty { continue }
+                    part.triangleIndices = MeshBuffer(kept)
+                    parts.append(part)
                 }
-                contents.models = models
-                if let new = try? MeshResource.generate(from: contents) { m.model?.mesh = new }
+                newModels.insert(MeshResource.Model(id: model.id, parts: parts))
             }
+            guard changed else { continue }
+            contents.models = newModels
+            if let new = try? MeshResource.generate(from: contents) { m.model?.mesh = new }
         }
     }
 
@@ -515,7 +539,7 @@ final class RangeScene {
         switch view {
         case .ground:
             root.scale = .one
-            root.position = [0, -1.1, -60]
+            root.position = [0, -0.1, -60]
             staticHolder.isEnabled = true
             hud?.position = [0, 1.15, -1.1]
         case .chase:
@@ -582,3 +606,5 @@ struct RangeLoadingPanel: View {
         .glassBackgroundEffect()
     }
 }
+
+private extension SIMD4 where Scalar == Float { var xyz: SIMD3<Float> { [x, y, z] } }

@@ -19,11 +19,12 @@ struct VisionSpacecraftApp: App {
     }
 
     var body: some Scene {
-        WindowGroup(id: WindowID.main) {
+        Window("Spacecraft", id: WindowID.main) {
             HomeView()
                 .environment(model)
                 .overlay { SceneLoadingOverlay(space: model.loadingSpace) }
                 .modifier(DebugLaunch(model: model))
+                .modifier(AccessoryCloseout(model: model))
                 #if DEBUG
                 .director { [model] in DemoRoutes.register($0, model: model) }
                 #endif
@@ -31,28 +32,28 @@ struct VisionSpacecraftApp: App {
         .windowStyle(.plain)
         .defaultSize(width: 900, height: 700)
 
-        WindowGroup(id: WindowID.parts) {
+        Window("Parts", id: WindowID.parts) {
             PartPickerView()
                 .environment(model)
         }
         .windowStyle(.plain)
         .defaultSize(width: 520, height: 720)
 
-        WindowGroup(id: WindowID.code) {
+        Window("Code", id: WindowID.code) {
             CodeEditorView()
                 .environment(model)
         }
         .windowStyle(.plain)
         .defaultSize(width: 1000, height: 760)
 
-        WindowGroup(id: WindowID.analysis) {
+        Window("Analysis", id: WindowID.analysis) {
             AnalysisView()
                 .environment(model)
         }
         .windowStyle(.plain)
         .defaultSize(width: 900, height: 640)
 
-        WindowGroup(id: WindowID.lesson) {
+        Window("Lesson", id: WindowID.lesson) {
             LessonDeckView()
                 .environment(model)
         }
@@ -188,6 +189,21 @@ struct SceneLoadingOverlay: View {
             .padding(32)
             .glassBackgroundEffect()
             .transition(.opacity)
+        }
+    }
+}
+
+/// Closes accessory windows when the main window goes away outside an immersive space.
+struct AccessoryCloseout: ViewModifier {
+    let model: AppModel
+    @Environment(\.dismissWindow) private var dismissWindow
+
+    func body(content: Content) -> some View {
+        content.onDisappear {
+            guard model.openSpace == nil else { return }
+            for id in [WindowID.parts, WindowID.code, WindowID.analysis, WindowID.lesson] {
+                dismissWindow(id: id)
+            }
         }
     }
 }
