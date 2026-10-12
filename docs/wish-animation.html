@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RocketCraft Wish</title>
+<style>
+@font-face { font-family: "Polea"; src: url("../fonts/Polea-ExtraBold.otf"); }
+@font-face { font-family: "Nebula"; src: url("../fonts/Nebula-Regular.otf"); }
+html, body { margin: 0; height: 100%; background: #070826; overflow: hidden; }
+canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+.ui { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); display: flex; gap: 10px; transition: opacity .5s; z-index: 2; }
+.ui.hide { opacity: 0; pointer-events: none; }
+button { font: 600 12px/1 "Nebula", system-ui, sans-serif; letter-spacing: .16em; text-transform: uppercase; color: #eafffb; cursor: pointer;
+  background: rgba(14, 16, 74, .78); border: 1px solid rgba(159, 251, 232, .45); border-radius: 999px; padding: 12px 20px; backdrop-filter: blur(10px);
+  box-shadow: 0 0 24px rgba(53, 240, 208, .25); }
+button:hover { background: rgba(40, 44, 130, .9); }
+:focus-visible { outline: 2px solid #35f0d0; outline-offset: 3px; }
+#hint { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 3; font: 11px "Nebula", sans-serif; letter-spacing: .24em; text-transform: uppercase; color: #cffff4; background: rgba(14, 16, 74, .6); border: 1px solid rgba(159, 251, 232, .35); border-radius: 999px; padding: 9px 16px; pointer-events: none; animation: nudge 2.4s ease-in-out infinite; }
+#hint[hidden] { display: none; }
+@keyframes nudge { 50% { opacity: .45; } }
+body.embed .ui { display: none; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<canvas id="cv" aria-label="Animated wish sequence ending in the RocketCraft logo" role="img"></canvas>
+<div id="hint" hidden>Tap for sound</div>
+<div class="ui hide" id="ui"><button id="replay">Replay</button><button id="mute" aria-pressed="false">Sound on</button></div>
+
+<script>
+(() => {
+'use strict';
+const cv = document.getElementById('cv'), c = cv.getContext('2d');
+let W = 0, H = 0;
+function fit() { const d = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight; cv.width = W * d; cv.height = H * d; c.setTransform(d, 0, 0, d, 0, 0); }
+addEventListener('resize', fit); fit();
+
+// ------------------------------------------------------------ helpers
+const TAU = Math.PI * 2, PI = Math.PI;
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v)), lerp = (a, b, t) => a + (b - a) * t;
+const eo3 = (t) => 1 - Math.pow(1 - clamp(t), 3), ei2 = (t) => clamp(t) ** 2;
+const eio = (t) => { t = clamp(t); return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; };
+const eob = (t) => { t = clamp(t); const s = 1.70158; return 1 + (s + 1) * Math.pow(t - 1, 3) + s * Math.pow(t - 1, 2); };
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+function rng(seed) { let t = seed >>> 0; return () => { t += 0x6D2B79F5; let r = Math.imul(t ^ (t >>> 15), 1 | t); r ^= r + Math.imul(r ^ (r >>> 7), 61 | r); return ((r ^ (r >>> 14)) >>> 0) / 4294967296; }; }
+const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+const mixc = (a, b, t) => { const A = hex(a), B = hex(b); return `rgb(${A.map((v, i) => Math.round(lerp(v, B[i], t))).join(',')})`; };
+const K = { ink: '#070826', navy: '#0d0f4a', indigo: '#1b1a6b', royal: '#2c2490', blue: '#3d6bff', sky: '#59b8ff', violet: '#7b3dff', purple: '#a35cff', magenta: '#c2208e', pink: '#ff5fa8', red: '#e8365d', teal: '#35f0d0', aqua: '#9ffbe8', white: '#ffffff', gold: '#ffd86b' };
+
+// Timeline (seconds)
+const T = { meteor: 1.0, impact: 3.9, galaxyDone: 6.6, jets: 5.0, white0: 6.45, logo: 7.0, word: 7.7, sub: 8.5, stars: 8.9, end: 11 };
+
+// ------------------------------------------------------------ seeded scene data
+const R = rng(2077);
+const STARS = Array.from({ length: 170 }, () => ({ x: R(), y: R() * 0.78, s: 0.6 + R() * 1.8, p: R() * TAU, k: R() < 0.08 }));
+function makeCloud(x, y, s, layer) {
+  // One silhouette built from lobes in two rows, plus small side puffs and a base slab. All units are fractions of H.
+  const bumps = [], nA = 5 + Math.floor(R() * 3), mA = (nA - 1) / 2, step = s * 0.68;
+  for (let i = 0; i < nA; i++) { const f = 1 - Math.abs(i - mA) / (mA + 0.8); bumps.push({ dx: (i - mA) * step + (R() - 0.5) * s * 0.12, dy: -s * 0.05 * R(), r: s * (0.34 + 0.3 * f) * (0.88 + R() * 0.28) }); }
+  const nB = 2 + Math.floor(R() * 2);
+  for (let i = 0; i < nB; i++) bumps.push({ dx: (R() - 0.5) * mA * step * 1.2, dy: -s * (0.34 + R() * 0.2), r: s * (0.36 + R() * 0.2) });
+  bumps.push({ dx: -mA * step - s * 0.38, dy: s * 0.04, r: s * 0.26 }, { dx: mA * step + s * 0.42, dy: s * 0.03, r: s * 0.3 });
+  const base = bumps.filter((b) => b.dy >= -s * 0.06), x0 = Math.min(...base.map((b) => b.dx)), x1 = Math.max(...base.map((b) => b.dx));
+  const covered = (px, py, self) => { for (let j = 0; j < bumps.length; j++) if (j !== self && Math.hypot(px - bumps[j].dx, py - bumps[j].dy) < bumps[j].r - 1e-4) return true; return py > 1e-4 && px > x0 && px < x1; };
+  bumps.forEach((b, i) => { // only the arcs that face the sky and are not buried inside a neighbouring lobe get rim light
+    b.runs = []; let run = null;
+    for (let a = -PI; a <= 1e-4; a += PI / 48) {
+      const open = !covered(b.dx + Math.cos(a) * b.r, b.dy + Math.sin(a) * b.r, i);
+      if (open) { if (!run) run = [a, a]; else run[1] = a; } else if (run) { b.runs.push(run); run = null; }
+    }
+    if (run) b.runs.push(run);
+  });
+  const dots = Array.from({ length: 6 }, () => ({ dx: x0 - s + R() * (x1 - x0 + s * 2), dy: -s * (0.9 + R() * 0.9), r: 0.002 + R() * 0.005 }));
+  const solid = layer === 'front' || layer === 'sea';
+  return { x, y, layer, bumps, x0, x1, bh: solid ? s * 1.5 : s * 0.34, w: x1 - x0 + s * 1.6, dots, alt: R() < 0.22, v: (0.4 + R() * 0.6) * ({ back: 1, mid: 1.6, sea: 2, front: 2.6 }[layer]) };
+}
+const CLOUDS = [];
+for (let i = 0; i < 5; i++) CLOUDS.push(makeCloud(R(), 0.6 + R() * 0.06, 0.06 + R() * 0.025, 'back'));
+for (let i = 0; i < 5; i++) CLOUDS.push(makeCloud(R(), 0.7 + R() * 0.07, 0.085 + R() * 0.025, 'mid'));
+for (let i = 0; i < 7; i++) CLOUDS.push(makeCloud(i / 6 + (R() - 0.5) * 0.08, 0.87 + R() * 0.04, 0.12 + R() * 0.03, 'sea'));
+for (let i = 0; i < 8; i++) CLOUDS.push(makeCloud(i / 7 + (R() - 0.5) * 0.06, 0.975 + R() * 0.025, 0.15 + R() * 0.04, 'front'));
+const CLOUD_STYLE = {
+  back: { fill: '#161b78', shade: '#0f1458', rim: '#4a7bff', hi: '#9ab8ff', outline: '#0b0e46' },
+  mid: { fill: '#2a33b0', shade: '#1e2590', rim: '#59e0ff', hi: '#ffffff', outline: '#121a6e' },
+  sea: { fill: '#1d2596', shade: '#141a76', rim: '#7ee8ff', hi: '#e6fbff', outline: '#0c1250' },
+  front: { fill: '#0d1258', shade: '#080b3c', rim: '#35f0d0', hi: '#b8fff0', outline: '#050728' },
+};
+const RING_COL = [K.teal, K.white, K.blue, K.violet, K.magenta, K.aqua, K.sky, K.pink, K.white, K.purple];
+const RINGS = Array.from({ length: 10 }, (_, i) => {
+  const rf = 0.14 + (i / 9) * 0.86, dashes = []; let a = R() * TAU;
+  while (a < TAU * 2) { const len = 0.12 + R() * 0.75, gap = 0.1 + R() * 0.5; dashes.push({ a, len }); a += len + gap; if (dashes.length > 24) break; }
+  return { rf, dashes, col: RING_COL[i], w: (0.014 + R() * 0.018) * (1.15 - rf * 0.4), om: 0.16 + (1.1 - rf) * 0.55 };
+});
+const BLOBS = Array.from({ length: 70 }, () => ({ rf: 0.2 + R() * 0.88, a: R() * TAU, r: 0.006 + R() * 0.022, col: [K.magenta, K.purple, K.blue, K.aqua, K.pink, K.sky][Math.floor(R() * 6)], om: 0.1 + R() * 0.4, dz: (R() - 0.5) * 0.08 }));
+const SPARKS = Array.from({ length: 48 }, () => ({ a: R() * TAU, v: 0.25 + R() * 0.6, len: 0.02 + R() * 0.05, col: [K.teal, K.aqua, K.white, K.pink, K.sky, K.gold][Math.floor(R() * 6)], w: 0.004 + R() * 0.006 }));
+const TAILSPK = Array.from({ length: 70 }, () => ({ k: 0.04 + R() * 0.96, lat: (R() - 0.5) * 2, s: 0.004 + R() * 0.008, ph: R() * TAU, col: [K.aqua, K.white, K.sky, K.pink, K.purple][Math.floor(R() * 5)] }));
+const SPARKLES = Array.from({ length: 22 }, () => ({ a: R() * TAU, d: 0.14 + R() * 0.3, s: 0.008 + R() * 0.016, ph: R() * TAU, col: [K.aqua, K.white, K.gold, K.pink][Math.floor(R() * 4)] }));
+
+// ------------------------------------------------------------ primitives
+function star4(x, y, r, col, a = 1) {
+  c.save(); c.globalAlpha *= a; c.fillStyle = col; c.beginPath();
+  c.moveTo(x, y - r); c.quadraticCurveTo(x, y, x + r, y); c.quadraticCurveTo(x, y, x, y + r); c.quadraticCurveTo(x, y, x - r, y); c.quadraticCurveTo(x, y, x, y - r); c.fill(); c.restore();
+}
+function star5(x, y, r, col) {
+  c.fillStyle = col; c.beginPath();
+  for (let i = 0; i < 10; i++) { const rr = i % 2 ? r * 0.46 : r, a = -PI / 2 + (i * PI) / 5; c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+  c.closePath(); c.fill();
+}
+function glow(x, y, r, col, steps = 5, a = 0.14) { // flat, stepped glow in the Kurzgesagt manner
+  c.save(); c.fillStyle = col;
+  for (let i = steps; i >= 1; i--) { c.globalAlpha = a * (1 + (steps - i) * 0.35); c.beginPath(); c.arc(x, y, (r * i) / steps, 0, TAU); c.fill(); }
+  c.restore();
+}
+function pill(x1, y1, x2, y2, w, col, a = 1) { c.save(); c.globalAlpha *= a; c.strokeStyle = col; c.lineWidth = w; c.lineCap = 'round'; c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke(); c.restore(); }
+
+// ------------------------------------------------------------ sky, stars, clouds
+function sky(t) {
+  const g = c.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#05061c'); g.addColorStop(0.5, '#10125a'); g.addColorStop(0.8, '#2a2196'); g.addColorStop(1, '#2d1fa0');
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+  // horizon bands: flat stepped glow
+  const hb = [['#3a2bc0', 0.0], ['#4a37d8', 0.05], ['#6a46ee', 0.1]];
+  hb.forEach(([col, d]) => { c.fillStyle = col; c.globalAlpha = 0.28; c.beginPath(); c.ellipse(W * 0.5, H * 0.92, W * (0.8 - d), H * (0.34 - d * 1.2), 0, 0, TAU); c.fill(); });
+  c.globalAlpha = 1;
+}
+function stars(t, wall) {
+  STARS.forEach((s) => {
+    const tw = 0.55 + 0.45 * Math.sin(wall * (1 + s.s) + s.p), x = s.x * W, y = s.y * H;
+    if (s.k) star4(x, y, 3 + s.s * 2.2 * tw, K.aqua, 0.9 * tw); else { c.fillStyle = '#dfe6ff'; c.globalAlpha = 0.35 + 0.5 * tw; c.fillRect(x, y, s.s, s.s); c.globalAlpha = 1; }
+  });
+}
+function push(x, t) { const s = eo3(seg(t, T.impact, T.impact + 1.8)), d = (x - W * 0.5) / W; return Math.sign(d || 1) * W * 0.17 * s * Math.exp(-Math.abs(d) * 2.6); }
+function clouds(t, wall, layer) {
+  CLOUDS.filter((cl) => cl.layer === layer).forEach((cl) => {
+    const st = Object.assign({}, CLOUD_STYLE[layer], cl.alt ? { rim: '#a98bff', hi: '#eadfff' } : {});
+    const span = W + cl.w * H * 2; let x = ((cl.x * span + wall * cl.v * 3) % span) - cl.w * H;
+    x += push(x, t);
+    const y = cl.y * H, lw = Math.max(2, H * 0.0085), p = new Path2D();
+    cl.bumps.forEach((b) => { p.moveTo((b.dx + b.r) * H, b.dy * H); p.arc(b.dx * H, b.dy * H, b.r * H, 0, TAU); });
+    const bw = (cl.x1 - cl.x0) * H; p.roundRect(cl.x0 * H, 0, bw, cl.bh * H, Math.min(cl.bh * H * 0.5, H * 0.04));
+    const top = Math.min(...cl.bumps.map((b) => b.dy - b.r)) * H, mid = (cl.x0 + cl.x1) / 2 * H;
+    c.save(); c.translate(x, y); c.lineJoin = 'round';
+    c.strokeStyle = st.outline; c.lineWidth = H * 0.009; c.stroke(p); c.fillStyle = st.fill; c.fill(p);
+    c.save(); c.clip(p);
+    c.fillStyle = st.shade; c.beginPath(); c.ellipse(mid, cl.bh * H * 0.35 + H * 0.02, bw * 0.85 + H * 0.1, -top * 0.62, 0, 0, TAU); c.fill();     // belly shadow
+    c.globalAlpha = 0.16; c.fillStyle = st.rim; c.beginPath(); c.ellipse(mid - bw * 0.18, top * 0.55, bw * 0.38 + H * 0.05, -top * 0.28, -0.12, 0, TAU); c.fill(); c.globalAlpha = 1;  // soft light on the crown
+    c.restore();
+    c.lineCap = 'round';
+    cl.bumps.forEach((b) => b.runs.forEach(([a0, a1]) => {                      // rim light hugging the silhouette
+      if (a1 - a0 < 0.05) return;
+      const rr = b.r * H - lw * 0.9; if (rr < 2) return;
+      c.strokeStyle = st.rim; c.lineWidth = lw; c.beginPath(); c.arc(b.dx * H, b.dy * H, rr, a0, a1); c.stroke();
+      const h0 = Math.max(a0, -PI * 0.92), h1 = Math.min(a1, -PI * 0.42);       // thin second highlight, upper-left only
+      if (h1 - h0 > 0.12 && b.r * H - lw * 2.4 > 2) { c.strokeStyle = st.hi; c.lineWidth = lw * 0.42; c.beginPath(); c.arc(b.dx * H, b.dy * H, b.r * H - lw * 2.4, h0 + 0.05, h1 - 0.05); c.stroke(); }
+    }));
+    c.fillStyle = st.rim; cl.dots.forEach((d) => { c.globalAlpha = 0.55; c.beginPath(); c.arc(d.dx * H, d.dy * H, d.r * H, 0, TAU); c.fill(); }); c.globalAlpha = 1;
+    c.restore();
+  });
+}
+
+// ------------------------------------------------------------ meteor
+// Flight path: a quadratic arc that sweeps across the sky, then dives into the impact point.
+const MS = () => ({ x: -W * 0.1, y: H * 0.17 }), MC = () => ({ x: W * 0.66, y: H * 0.0 }), ME = () => ({ x: W * 0.5, y: H * 0.5 });
+function pathAt(u) { const S = MS(), C = MC(), E = ME(), a = (1 - u) * (1 - u), b = 2 * (1 - u) * u, d = u * u; return { x: a * S.x + b * C.x + d * E.x, y: a * S.y + b * C.y + d * E.y }; }
+function pathDir(u) { const S = MS(), C = MC(), E = ME(), dx = 2 * (1 - u) * (C.x - S.x) + 2 * u * (E.x - C.x), dy = 2 * (1 - u) * (C.y - S.y) + 2 * u * (E.y - C.y), m = Math.hypot(dx, dy) || 1; return { x: dx / m, y: dy / m, m }; }
+function rocket(L, Wd, wall, boost, roll) {
+  // Soft, chunky space-shuttle stack in the scene's flat style. Points along +x, seen from above, and rolls about its long axis:
+  // boosters and wings swing around the tank (cos/sin of the roll) and are depth-sorted so they pass in front of and behind it.
+  const ink = K.navy, lw = Math.max(2.4, L * 0.02), fl = 0.62 + 0.14 * Math.sin(wall * 38) + 0.08 * Math.sin(wall * 61), by = L * 0.2;
+  const cr = Math.cos(roll), sr = Math.sin(roll), under = cr < 0, WHITE = '#f1f2ff', SHADE = '#b3b9f7', DARK = '#252a6e';
+  c.lineJoin = 'round'; c.lineCap = 'round'; c.strokeStyle = ink; c.lineWidth = lw;
+  const flame = (y, x0, len, w, cols) => cols.forEach(([f, col]) => {
+    const l = len * f, ww = w * f + w * 0.12; c.fillStyle = col; c.beginPath();
+    c.moveTo(x0, y - ww); c.bezierCurveTo(x0 - l * 0.55, y - ww * 1.25, x0 - l * 0.95, y - ww * 0.5, x0 - l, y); c.bezierCurveTo(x0 - l * 0.95, y + ww * 0.5, x0 - l * 0.55, y + ww * 1.25, x0, y + ww); c.closePath(); c.fill();
+  });
+  [-1, 1].forEach((sd) => flame(sd * by * cr, -L * 0.47, L * fl * (1 + boost), L * 0.058, [[1, '#ff7a59'], [0.72, K.gold], [0.42, K.white]]));
+  [-1, 1].forEach((sd) => flame(sd * L * 0.035 - L * 0.1 * sr, -L * 0.44, L * 0.3 * (fl + 0.2), L * 0.026, [[1, K.sky], [0.6, K.aqua], [0.3, K.white]]));
+  const parts = [];
+  [1, -1].forEach((sd) => parts.push({ z: sd * by * sr, draw: () => {                           // solid rocket booster: a capsule
+    const y = sd * by * cr, h = L * 0.066, p = new Path2D(); p.roundRect(-L * 0.45, y - h, L * 0.9, h * 2, [h * 0.7, h, h, h * 0.7]);
+    c.fillStyle = '#2a2f8e'; c.beginPath(); c.roundRect(-L * 0.52, y - h * 0.62, L * 0.1, h * 1.24, h * 0.4); c.fill(); c.stroke();
+    c.fillStyle = WHITE; c.fill(p); c.save(); c.clip(p); c.fillStyle = SHADE; c.fillRect(-L, y + (sd > 0 ? h * 0.15 : -h), L * 2, h * 0.85);
+    c.fillStyle = K.red; c.fillRect(L * 0.05, y - h, L * 0.04, h * 2); c.fillStyle = '#2a2f8e'; c.fillRect(-L * 0.45, y - h, L * 0.05, h * 2); c.restore(); c.stroke(p);
+  } }));
+  parts.push({ z: 0, draw: () => {                                                              // external tank: orange capsule with a blunt nose
+    const eh = L * 0.122, p = new Path2D(); p.roundRect(-L * 0.4, -eh, L * 0.98, eh * 2, [eh * 0.5, eh, eh, eh * 0.5]);
+    c.fillStyle = '#e8803c'; c.fill(p); c.save(); c.clip(p);
+    c.fillStyle = '#c2551f'; c.fillRect(-L, eh * 0.2, L * 2, eh); c.fillStyle = '#f7a35c'; c.fillRect(-L, -eh, L * 2, eh * 0.3);
+    c.fillStyle = 'rgba(120,40,10,.4)'; [0.0, 0.17].forEach((x) => c.fillRect(L * x, -eh, L * 0.014, eh * 2)); c.restore(); c.stroke(p);
+  } });
+  parts.push({ z: L * 0.1 * cr, draw: () => {                                                   // orbiter: soft delta wings and a rounded fuselage
+    const zo = L * 0.1;
+    c.save(); c.translate(0, -zo * sr); c.save(); c.scale(1, cr || 0.001);
+    [-1, 1].forEach((sd) => {
+      const p = new Path2D(); p.moveTo(L * 0.03, sd * L * 0.075); p.lineTo(-L * 0.36, sd * L * 0.3); p.quadraticCurveTo(-L * 0.47, sd * L * 0.35, -L * 0.47, sd * L * 0.24); p.lineTo(-L * 0.47, sd * L * 0.08); p.closePath();
+      c.fillStyle = under ? DARK : WHITE; c.fill(p); c.save(); c.clip(p); c.strokeStyle = under ? WHITE : DARK; c.lineWidth = L * 0.04; c.globalAlpha = 0.9; c.beginPath(); c.moveTo(L * 0.03, sd * L * 0.075); c.lineTo(-L * 0.36, sd * L * 0.3); c.stroke(); c.globalAlpha = 1;
+      c.fillStyle = K.red; c.fillRect(-L * 0.47, sd > 0 ? L * 0.25 : -L * 0.35, L * 0.05, L * 0.1); c.restore(); c.strokeStyle = ink; c.lineWidth = lw; c.stroke(p);
+    });
+    c.restore();
+    const fh = L * 0.07, fu = new Path2D(); fu.roundRect(-L * 0.42, -fh, L * 0.66, fh * 2, [fh * 0.6, fh, fh, fh * 0.6]);
+    c.fillStyle = under ? DARK : WHITE; c.fill(fu); c.save(); c.clip(fu); c.fillStyle = under ? WHITE : DARK; c.beginPath(); c.moveTo(L * 0.14, -fh); c.quadraticCurveTo(L * 0.08, 0, L * 0.14, fh); c.lineTo(L * 0.4, fh); c.lineTo(L * 0.4, -fh); c.fill();
+    c.fillStyle = under ? '#4a50b8' : SHADE; c.fillRect(-L, fh * 0.2, L * 2, fh); c.fillStyle = K.teal; c.fillRect(-L * 0.28, -fh, L * 0.03, fh * 2); c.restore(); c.stroke(fu);
+    if (!under) { c.fillStyle = K.aqua; c.beginPath(); c.roundRect(L * 0.03, -fh * 0.5, L * 0.07, fh, fh * 0.35); c.fill(); }
+    c.restore();
+  } });
+  parts.sort((a, b) => a.z - b.z).forEach((p) => p.draw());
+}
+function meteor(t, wall) {
+  const p = seg(t, T.meteor, T.impact), u = Math.pow(p, 1.75);
+  if (p <= 0 || t >= T.impact) return;
+  const head = pathAt(u), hd = pathDir(u), hx = head.x, hy = head.y, ux = hd.x, uy = hd.y;
+  const Wd = H * (0.045 + 0.035 * u), L = Wd * 3.9, ang = Math.atan2(uy, ux), roll = Math.pow(p, 1.25) * TAU * 2;     // two barrel rolls, ending upright
+  // the exhaust follows the curve: sample the path backwards from just behind the booster flames
+  const u0 = u - (L * 0.82) / hd.m, duT = 0.36 * (0.35 + 0.65 * u), pw = Wd * 0.2, w = Wd * 0.55;
+  const fe = { x: hx - ux * L * 0.82, y: hy - uy * L * 0.82 }, q0 = pathAt(clamp(u0, 0, 1)), D = { x: fe.x - q0.x, y: fe.y - q0.y };   // join the plume to the flame tips
+  const pt = (f, lat) => { const uu = clamp(u0 - f * duT, 0, 1), q = pathAt(uu), d = pathDir(uu), k = Math.pow(1 - f, 2); return { x: q.x + D.x * k - d.y * lat, y: q.y + D.y * k + d.x * lat }; };
+  const p0 = pt(0, 0), p1 = pt(1, 0), gr = c.createLinearGradient(p0.x, p0.y, p1.x, p1.y);
+  gr.addColorStop(0, '#ffe58a'); gr.addColorStop(0.3, '#ff7a59'); gr.addColorStop(0.65, '#a35cff'); gr.addColorStop(1, 'rgba(61,107,255,0)');
+  const ribbon = (off, wm, fillStyle, a) => {
+    const N = 30, A = [], B = []; for (let i = 0; i <= N; i++) { const f = i / N, wv = pw * wm * Math.pow(1 - f, 0.85); A.push(pt(f, off + wv)); B.push(pt(f, off - wv)); }
+    c.save(); c.globalAlpha = a; c.fillStyle = fillStyle; c.beginPath(); A.forEach((q, i) => (i ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y))); for (let i = N; i >= 0; i--) c.lineTo(B[i].x, B[i].y); c.closePath(); c.fill(); c.restore();
+  };
+  [-1, 1].forEach((sd) => { const off = sd * L * 0.2 * Math.cos(roll); ribbon(off, 2.2, K.violet, 0.26); ribbon(off, 1.5, gr, 0.85); ribbon(off, 0.75, '#ffe9a8', 0.9); ribbon(off, 0.3, K.white, 1); });
+  for (let k = 0; k < 9; k++) {                                                // flat motion dashes along the curve
+    const lat = (k - 4) * w * 0.42, f0 = (k * 0.173 + wall * 1.1) % 1, f1 = Math.min(1, f0 + 0.14), a0 = pt(f0, lat), a1 = pt(f1, lat);
+    pill(a0.x, a0.y, a1.x, a1.y, w * 0.14, k % 2 ? K.aqua : K.white, 0.5 * (1 - f0));
+  }
+  for (let i = 0; i < 11; i++) {                                               // smoke puffs with a white crescent
+    const f = (i / 11 + wall * 0.35) % 1, q = pt(f * 0.9, Math.sin(i * 2.3) * w * (0.4 + f * 1.6)), r = w * (0.35 + f * 1.1);
+    c.save(); c.globalAlpha = (1 - f) * 0.75; c.fillStyle = i % 3 ? '#c9b8ff' : '#8fd8ff'; c.beginPath(); c.arc(q.x, q.y, r, 0, TAU); c.fill();
+    c.strokeStyle = K.white; c.lineWidth = Math.max(1.5, r * 0.22); c.lineCap = 'round'; c.beginPath(); c.arc(q.x, q.y, r * 0.66, PI * 1.05, PI * 1.62); c.stroke(); c.restore();
+  }
+  TAILSPK.forEach((sp) => { const q = pt(sp.k * 0.95, sp.lat * w * 2.4), tw = 0.5 + 0.5 * Math.sin(wall * 7 + sp.ph); star4(q.x, q.y, sp.s * H * (0.6 + tw), sp.col, 0.35 + 0.65 * (1 - sp.k) * tw); });
+  glow(hx - ux * L * 0.35, hy - uy * L * 0.35, Wd * 3, '#ff9a5a', 4, 0.1);
+  c.save(); c.translate(hx, hy); c.rotate(ang); rocket(L, Wd, wall, 0.25 * u, roll); c.restore();
+}
+
+// ------------------------------------------------------------ the shuttle explodes: fireball, debris, smoke
+const DEBRIS = Array.from({ length: 18 }, (_, i) => ({ kind: i < 2 ? 'srb' : i < 4 ? 'tank' : i < 6 ? 'wing' : 'chunk', a: R() * TAU, v: 0.18 + R() * 0.34, w: (R() - 0.5) * 14, s: i < 6 ? 0.026 + R() * 0.01 : 0.007 + R() * 0.012, col: [K.gold, '#ff7a59', K.white, K.pink][Math.floor(R() * 4)], ph: R() * TAU }));
+const SMOKE = Array.from({ length: 14 }, () => ({ a: R() * TAU, v: 0.12 + R() * 0.3, r: 0.035 + R() * 0.06, col: R() < 0.5 ? '#c9b8ff' : '#8fd8ff' }));
+function explosion(t) {
+  const dt = t - T.impact; if (dt < 0 || dt > 2.4) return; const cx = W * 0.5, cy = H * 0.5;
+  // blobby stepped fireball (outer red to white core)
+  const U = Math.min(W, H), grow = eo3(dt / 0.75), fade = 1 - seg(dt, 0.7, 1.5), R0 = U * 0.33 * grow;
+  if (fade > 0) {
+    c.save(); c.globalAlpha = fade;
+    [[1, '#e8365d'], [0.84, '#ff7a59'], [0.64, K.gold], [0.42, '#fff3c4'], [0.22, K.white]].forEach(([f, col], j) => {
+      c.fillStyle = col; const r = R0 * f;
+      for (let k = 0; k < 10; k++) { const a = (k / 10) * TAU + j * 0.4, rr = r * (0.5 + 0.1 * Math.sin(k * 5.1 + j)), d = r * 0.55 + Math.sin(k * 3.7) * r * 0.08; c.beginPath(); c.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d * 0.82, rr, 0, TAU); c.fill(); }
+      c.beginPath(); c.arc(cx, cy, r * 0.62, 0, TAU); c.fill();
+    });
+    c.restore();
+  }
+  // flat burst rays
+  SPARKS.forEach((sp, i) => { if (i % 2) return; const d = eo3(seg(dt, 0, 0.9)) * U * (0.2 + sp.v * 0.5), a = 1 - seg(dt, 0.35, 1.2); if (a <= 0) return; const dx = Math.cos(sp.a), dy = Math.sin(sp.a) * 0.85; pill(cx + dx * d, cy + dy * d, cx + dx * (d + U * 0.05), cy + dy * (d + U * 0.05), U * 0.009, i % 4 ? K.gold : '#ff7a59', a); });
+  // smoke puffs
+  SMOKE.forEach((sm) => { const d = U * 0.2 + eo3(seg(dt, 0.1, 2.0)) * sm.v * W * 0.55, a = seg(dt, 0.25, 0.6) * (1 - seg(dt, 0.9, 1.9)) * 0.75, r = sm.r * U * (0.45 + 0.7 * eo3(dt / 1.2)); if (a <= 0) return; const x = cx + Math.cos(sm.a) * d, y = cy + Math.sin(sm.a) * d * 0.7;
+    c.save(); c.globalAlpha = a; c.fillStyle = sm.col; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); c.strokeStyle = K.white; c.lineWidth = Math.max(2, r * 0.2); c.lineCap = 'round'; c.beginPath(); c.arc(x, y, r * 0.66, PI * 1.05, PI * 1.62); c.stroke(); c.restore(); });
+  // tumbling debris: boosters, tank halves, wings, glowing chunks
+  DEBRIS.forEach((d) => {
+    const k = eo3(seg(dt, 0, 1.5)), dist = d.v * W * 0.55 * k, a = 1 - seg(dt, 1.2, 2.3); if (a <= 0) return;
+    const x = cx + Math.cos(d.a) * dist, y = cy + Math.sin(d.a) * dist * 0.8 + dt * dt * H * 0.05, s = d.s * U, rot = d.ph + d.w * dt;
+    c.save(); c.globalAlpha = a; c.translate(x, y); c.rotate(rot); c.strokeStyle = K.navy; c.lineWidth = Math.max(2, s * 0.14); c.lineJoin = 'round';
+    if (d.kind === 'srb') { c.fillStyle = '#f1f2ff'; c.beginPath(); c.roundRect(-s * 1.7, -s * 0.5, s * 3.4, s, s * 0.5); c.fill(); c.stroke(); c.fillStyle = K.red; c.fillRect(-s * 0.2, -s * 0.5, s * 0.35, s); }
+    else if (d.kind === 'tank') { c.fillStyle = '#e8803c'; c.beginPath(); c.roundRect(-s * 1.4, -s * 0.62, s * 2.8, s * 1.24, s * 0.55); c.fill(); c.stroke(); c.fillStyle = '#c2551f'; c.fillRect(-s * 1.2, s * 0.05, s * 2.4, s * 0.45); }
+    else if (d.kind === 'wing') { c.fillStyle = '#f1f2ff'; c.beginPath(); c.moveTo(s * 1.2, -s * 0.6); c.lineTo(-s * 1.3, s * 0.1); c.quadraticCurveTo(-s * 1.5, s * 0.9, -s * 1.1, s * 0.8); c.lineTo(s * 1.2, s * 0.3); c.closePath(); c.fill(); c.stroke(); c.strokeStyle = '#252a6e'; c.lineWidth = s * 0.28; c.beginPath(); c.moveTo(s * 1.2, -s * 0.6); c.lineTo(-s * 1.3, s * 0.1); c.stroke(); }
+    else { c.fillStyle = d.col; c.beginPath(); c.arc(0, 0, s, 0, TAU); c.fill(); c.strokeStyle = K.white; c.lineWidth = Math.max(1.5, s * 0.3); c.lineCap = 'round'; c.beginPath(); c.arc(0, 0, s * 0.62, PI * 1.05, PI * 1.62); c.stroke(); }
+    c.restore();
+  });
+}
+
+// ------------------------------------------------------------ impact: flash, rainbow ring, shock, sparks
+function impact(t) {
+  const dt = t - T.impact; if (dt < 0) return; const cx = W * 0.5, cy = H * 0.5;
+  // rainbow prism ring (circular, like the reference)
+  const rr = seg(dt, 0, 1.1), rad = eo3(rr) * Math.min(W, H) * 0.34, ra = 1 - seg(dt, 0.6, 1.6);
+  if (ra > 0 && rad > 2) ['#e8365d', '#ff9a3d', '#ffd86b', '#7dff9a', '#35d9ff', '#6a7bff', '#c05cff'].forEach((col, i) => { c.save(); c.globalAlpha = ra * 0.85; c.strokeStyle = col; c.lineWidth = Math.max(2, H * 0.006); c.beginPath(); c.arc(cx, cy, rad + i * H * 0.0065, 0, TAU); c.stroke(); c.restore(); });
+  // perspective shock rings
+  [0, 0.18, 0.36].forEach((d, i) => {
+    const s = seg(dt, d, d + 1.7), rx = eo3(s) * W * 0.62, a = (1 - s) * 0.8; if (s <= 0 || a <= 0) return;
+    c.save(); c.globalAlpha = a; c.strokeStyle = i ? K.aqua : K.white; c.lineWidth = H * (0.014 - i * 0.003) * (1 - s * 0.6); c.beginPath(); c.ellipse(cx, cy, rx, rx * 0.34, -0.22, 0, TAU); c.stroke(); c.restore();
+  });
+  // radiating sparks
+  SPARKS.forEach((s) => { const d = eo3(seg(dt, 0, 1.3)) * s.v * W * 0.55, a = 1 - seg(dt, 0.5, 1.5); if (a <= 0) return; const dx = Math.cos(s.a), dy = Math.sin(s.a) * 0.62, L = s.len * H * (1 - seg(dt, 0.2, 1.5)); pill(cx + dx * d, cy + dy * d, cx + dx * (d + L), cy + dy * (d + L), s.w * H, s.col, a); });
+}
+function flash(t) {
+  const dt = t - T.impact; if (dt < 0 || dt > 0.45) return; const a = 1 - seg(dt, 0, 0.45);
+  c.save(); c.globalAlpha = a * 0.7; c.fillStyle = '#fff6d8'; c.beginPath(); c.arc(W * 0.5, H * 0.5, lerp(H * 0.15, W * 0.8, eo3(dt / 0.4)), 0, TAU); c.fill(); c.globalAlpha = a * 0.3; c.fillRect(0, 0, W, H); c.restore();
+}
+
+// ------------------------------------------------------------ Kurzgesagt galaxy
+function galaxy(t, wall, alpha) {
+  const dt = t - T.impact; if (dt < 0) return; const s = eo3(dt / (T.galaxyDone - T.impact)), cx = W * 0.5, cy = H * 0.5, RX = W * 0.46 * s, tilt = -0.22;
+  if (RX < 4) return;
+  c.save(); c.globalAlpha = alpha; c.translate(cx, cy); c.rotate(tilt);
+  const flat = 0.42, spin = (1 - s) * 2.6;
+  [[1.08, '#0b0e52'], [0.94, '#171a78'], [0.8, '#2420a0'], [0.66, '#3a2fd0'], [0.52, '#6a3df0'], [0.38, '#2fb6d8'], [0.26, '#8ff5e0'], [0.15, '#e8fffb']].forEach(([f, col]) => { c.fillStyle = col; c.beginPath(); c.ellipse(0, 0, RX * f, RX * f * flat, 0, 0, TAU); c.fill(); });
+  RINGS.forEach((rg) => {
+    const rx = RX * rg.rf * 1.05, ry = rx * flat, rot = spin * rg.om * 2 + wall * rg.om;
+    c.strokeStyle = rg.col; c.lineWidth = Math.max(3, rg.w * H); c.lineCap = 'round';
+    rg.dashes.forEach((d) => { c.beginPath(); c.ellipse(0, 0, rx, ry, 0, d.a + rot, d.a + rot + d.len * (0.55 + 0.45 * s)); c.stroke(); });
+  });
+  BLOBS.forEach((b) => {
+    const a = b.a + spin * b.om + wall * b.om, rx = RX * b.rf, x = Math.cos(a) * rx, y = Math.sin(a) * rx * flat + b.dz * H * s, r = b.r * H * (0.5 + 0.5 * s);
+    c.fillStyle = b.col; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill();
+    c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = Math.max(1.5, r * 0.28); c.lineCap = 'round'; c.beginPath(); c.arc(x, y, r * 0.66, PI * 1.05, PI * 1.62); c.stroke();
+  });
+  c.restore();
+  // core glow
+  glow(cx, cy, H * 0.22 * s, K.white, 5, 0.1); glow(cx, cy, H * 0.1 * s, K.aqua, 4, 0.22);
+}
+
+// ------------------------------------------------------------ jets with helix
+function jets(t, wall) {
+  const a = eo3(seg(t, T.jets, T.jets + 0.9)) * (1 - seg(t, T.logo - 0.1, T.logo + 0.9)); if (a <= 0) return;
+  const cx = W * 0.5, cy = H * 0.5, tilt = -0.22 - PI / 2;
+  [[1, 0.52], [-1, 0.4]].forEach(([dir, len], idx) => {
+    c.save(); c.translate(cx, cy); c.rotate(tilt + (dir < 0 ? PI : 0)); c.globalAlpha = a;
+    const L = H * len * 1.6, w0 = H * 0.012, w1 = H * 0.09;
+    [[1.5, K.violet, 0.28], [1, K.teal, 0.45], [0.55, K.aqua, 0.7], [0.2, K.white, 0.95]].forEach(([m, col, al]) => { c.globalAlpha = a * al; c.fillStyle = col; c.beginPath(); c.moveTo(0, -w0 * m); c.lineTo(L, -w1 * m); c.lineTo(L, w1 * m); c.lineTo(0, w0 * m); c.closePath(); c.fill(); });
+    c.globalAlpha = a;
+    for (let i = 0; i < 26; i++) {
+      const f = (i / 26 + wall * 0.22) % 1, x = f * L, ww = lerp(w0, w1, f) * 0.95, ph = f * 16 - wall * 3.2;
+      [0, PI].forEach((o, k) => { const y = Math.sin(ph + o) * ww, z = Math.cos(ph + o), r = H * 0.0045 * (0.7 + 0.5 * z) * (1 + f * 0.8); c.fillStyle = k ? K.aqua : K.white; c.globalAlpha = a * (0.5 + 0.5 * z) * (1 - f * 0.6); c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); });
+    }
+    c.restore();
+  });
+}
+
+// ------------------------------------------------------------ logo reveal
+function logoMark(cx, cy, r, t, wall) {
+  glow(cx, cy, r * 3.1, K.teal, 6, 0.07); glow(cx, cy, r * 2.0, K.violet, 5, 0.12);
+  // Each orbit is drawn in two halves so its far side passes behind the orb and its near side in front.
+  const orbit = (half) => {
+    c.save(); c.translate(cx, cy); c.rotate(-0.35);
+    const B = r * 6; c.beginPath(); c.rect(-B, half === 'back' ? -B : 0, B * 2, B); c.clip();
+    [[1.55, 0.3, K.aqua, 0.4], [1.9, 0.22, K.pink, -0.3], [2.25, 0.16, K.white, 0.2]].forEach(([f, fl, col, sp], i) => {
+      c.strokeStyle = col; c.lineWidth = r * (0.11 - i * 0.02); c.lineCap = 'round';
+      for (let k = 0; k < 3; k++) { const a0 = wall * sp * 1.4 + k * (TAU / 3) + i; c.beginPath(); c.ellipse(0, 0, r * f, r * f * fl * 2, 0, a0, a0 + 0.9); c.stroke(); }
+    });
+    c.restore();
+  };
+  orbit('back');
+  let fill; try { fill = c.createConicGradient(-PI / 2 + wall * 0.5, cx, cy); fill.addColorStop(0, K.teal); fill.addColorStop(0.33, K.blue); fill.addColorStop(0.66, K.purple); fill.addColorStop(1, K.teal); } catch (e) { fill = K.blue; }
+  c.fillStyle = K.navy; c.beginPath(); c.arc(cx, cy, r * 1.12, 0, TAU); c.fill();
+  c.fillStyle = fill; c.beginPath(); c.arc(cx, cy, r, 0, TAU); c.fill();
+  c.fillStyle = 'rgba(7,8,38,.32)'; c.beginPath(); c.arc(cx + r * 0.14, cy + r * 0.16, r * 0.78, 0, TAU); c.fill();
+  c.fillStyle = K.white; c.beginPath(); c.arc(cx - r * 0.2, cy - r * 0.24, r * 0.34, 0, TAU); c.fill();
+  c.strokeStyle = 'rgba(255,255,255,.95)'; c.lineWidth = r * 0.1; c.lineCap = 'round'; c.beginPath(); c.arc(cx, cy, r * 0.86, PI * 1.08, PI * 1.5); c.stroke();
+  orbit('front');
+}
+function logo(t, wall) {
+  const dt = t - T.logo; if (dt < 0) return;
+  const cx = W * 0.5, base = H * 0.35, r = Math.min(H * 0.1, W * 0.16), k = eob(seg(dt, 0.1, 1.3)), bob = Math.sin(wall * 1.5) * H * 0.006 * seg(dt, 1.2, 2.2);
+  const cy = base + bob;
+  c.save(); c.translate(cx, cy); c.scale(k, k); c.translate(-cx, -cy); c.globalAlpha = clamp(k * 1.5); logoMark(cx, cy, r, t, wall); c.restore();
+  SPARKLES.forEach((s) => { const a = seg(dt, 0.6, 1.4), tw = 0.5 + 0.5 * Math.sin(wall * 3 + s.ph), d = s.d * Math.min(W, H) * (0.6 + 0.4 * eo3(seg(dt, 0.2, 1.6))); star4(cx + Math.cos(s.a) * d * 1.5, cy + Math.sin(s.a) * d, s.s * H * (0.5 + tw), s.col, a * (0.4 + 0.6 * tw)); });
+  // wordmark, letter by letter
+  const text = 'RocketCraft', fs = Math.min(H * 0.105, W * 0.12), y = cy + r * 2.35 + fs * 0.7;
+  c.font = `${fs}px Polea, system-ui, sans-serif`; c.textBaseline = 'alphabetic';
+  const widths = [...text].map((ch) => c.measureText(ch).width), total = widths.reduce((a, b) => a + b, 0) + fs * 0.03 * (text.length - 1);
+  let x = cx - total / 2;
+  { const pa = eo3(seg(t, T.word - 0.3, T.word + 0.7)); c.save(); c.fillStyle = K.ink;
+    [[1.0, 0.18], [0.82, 0.22], [0.64, 0.26]].forEach(([f, al]) => { c.globalAlpha = pa * al * 2; c.beginPath(); c.ellipse(cx, y + fs * 0.35, total * 0.72 * f, fs * 1.75 * f, 0, 0, TAU); c.fill(); }); c.restore(); }
+  [...text].forEach((ch, i) => {
+    const p = eob(seg(t, T.word + i * 0.06, T.word + i * 0.06 + 0.55)), a = clamp(p * 1.4);
+    if (a > 0) {
+      c.save(); c.globalAlpha = a; c.translate(0, (1 - p) * fs * 0.55);
+      c.fillStyle = K.royal; c.fillText(ch, x, y + fs * 0.075); c.fillStyle = K.violet; c.fillText(ch, x, y + fs * 0.04);
+      const g = c.createLinearGradient(0, y - fs * 0.8, 0, y); g.addColorStop(0, K.white); g.addColorStop(1, K.aqua); c.fillStyle = g; c.fillText(ch, x, y); c.restore();
+    }
+    x += widths[i] + fs * 0.03;
+  });
+  // subtitle
+  const sa = eo3(seg(t, T.sub, T.sub + 0.7)), sub = 'OBSTACLE  AVOIDANCE', sf = Math.max(12, fs * 0.2);
+  c.font = `${sf}px Nebula, system-ui, sans-serif`; c.fillStyle = '#e9fffb'; c.globalAlpha = sa;
+  const sw = [...sub].map((ch) => c.measureText(ch).width + sf * 0.34), stot = sw.reduce((a, b) => a + b, 0); let sx = cx - stot / 2;
+  [...sub].forEach((ch, i) => { c.fillText(ch, sx, y + fs * 0.6 + (1 - sa) * 10); sx += sw[i]; }); c.globalAlpha = 1;
+  // rarity stars, a nod to the wish screen
+  for (let i = 0; i < 5; i++) {
+    const p = eob(seg(t, T.stars + i * 0.12, T.stars + i * 0.12 + 0.45)); if (p <= 0) continue;
+    const sx2 = cx + (i - 2) * fs * 0.42, sy = y + fs * 1.05, rr = fs * 0.15 * p;
+    glow(sx2, sy, rr * 2.6, K.gold, 3, 0.16); star5(sx2, sy, rr * 1.05, '#e0a528'); star5(sx2, sy - rr * 0.05, rr, K.gold);
+    if (p < 0.99) star4(sx2, sy, rr * 2.2, K.white, 1 - p);
+  }
+}
+function whiteout(t) {
+  const a = eio(seg(t, T.white0, T.logo)) * (1 - eio(seg(t, T.logo + 0.02, T.logo + 0.95)));
+  if (a <= 0) return;
+  c.save(); c.globalAlpha = a; const g = c.createRadialGradient(W * 0.5, H * 0.5, 0, W * 0.5, H * 0.5, Math.max(W, H) * 0.7); g.addColorStop(0, '#ffffff'); g.addColorStop(0.6, '#d8fff6'); g.addColorStop(1, '#9fdcff'); c.fillStyle = g; c.fillRect(0, 0, W, H); c.restore();
+}
+
+// ------------------------------------------------------------ frame
+function draw(t, wall) {
+  const dt = t - T.impact, shake = dt > 0 && dt < 0.7 ? (1 - dt / 0.7) * H * 0.012 : 0;
+  c.save(); if (shake) c.translate((Math.random() - 0.5) * shake * 2, (Math.random() - 0.5) * shake * 2);
+  sky(t); stars(t, wall); clouds(t, wall, 'back');
+  const dim = 1 - 0.62 * eio(seg(t, T.logo, T.logo + 1.5));
+  galaxy(t, wall, dim); jets(t, wall); meteor(t, wall); impact(t); explosion(t);
+  clouds(t, wall, 'mid'); clouds(t, wall, 'sea'); clouds(t, wall, 'front');
+  flash(t); whiteout(t); logo(t, wall);
+  c.restore();
+}
+
+// ------------------------------------------------------------ sound (synthesized)
+let actx = null, master = null, nodes = [], muted = false;
+function noiseBuf() { const b = actx.createBuffer(1, actx.sampleRate * 2, actx.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; return b; }
+function stopAudio() { if (master) { try { master.gain.cancelScheduledValues(actx.currentTime); master.gain.setTargetAtTime(0, actx.currentTime, 0.05); } catch (e) { /* ignore */ } } nodes.forEach((n) => { try { n.stop(actx.currentTime + 0.3); } catch (e) { /* already stopped */ } }); nodes = []; }
+function startAudio(el = 0) {                       // el: seconds of the sequence already elapsed (when sound starts late)
+  try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
+  if (actx.state === 'suspended') actx.resume();
+  stopAudio(); master = actx.createGain(); master.gain.value = muted ? 0 : 0.8; master.connect(actx.destination);
+  const t0 = actx.currentTime + 0.05, at = (s) => t0 + s - el;
+  const env = (g, s, a, peak, rel) => { g.gain.setValueAtTime(0.0001, at(s)); g.gain.linearRampToValueAtTime(peak, at(s + a)); g.gain.exponentialRampToValueAtTime(0.0001, at(s + a + rel)); };
+  const osc = (type, f0, s, dur, fn) => { if (s < el - 0.02) return; const o = actx.createOscillator(), g = actx.createGain(); o.type = type; o.frequency.setValueAtTime(f0, at(s)); fn && fn(o, g); o.connect(g); g.connect(master); o.start(at(s)); o.stop(at(s + dur)); nodes.push(o); return { o, g }; };
+  const nz = (s, dur, ftype, f0, f1, peak, a, rel) => { if (s < el - 0.02) return; const src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain(); src.buffer = noiseBuf(); src.loop = true; f.type = ftype; f.Q.value = 1.2; f.frequency.setValueAtTime(f0, at(s)); f.frequency.exponentialRampToValueAtTime(f1, at(s + dur)); env(g, s, a, peak, rel); src.connect(f); f.connect(g); g.connect(master); src.start(at(s)); src.stop(at(s + dur + 0.2)); nodes.push(src); };
+  nz(T.meteor, T.impact - T.meteor, 'bandpass', 300, 4200, 0.5, T.impact - T.meteor - 0.1, 0.12);                  // rocket whoosh
+  nz(T.meteor, T.impact - T.meteor, 'lowpass', 240, 900, 0.32, 1.4, 0.15);                                            // engine rumble
+  const boom = osc('sine', 130, T.impact, 2.4, (o, g) => { o.frequency.exponentialRampToValueAtTime(34, at(T.impact + 1.4)); env(g, T.impact, 0.01, 0.95, 2.2); });
+  nz(T.impact, 1.4, 'lowpass', 1800, 160, 0.55, 0.01, 1.2);                                                          // impact thump
+  [261.63, 329.63, 392, 493.88].forEach((f, i) => osc('sine', f, T.impact + 0.3, 4, (o, g) => { env(g, T.impact + 0.3, 2.2, 0.05, 1.8); o.detune.value = (i - 1.5) * 4; }));   // galaxy pad
+  osc('sawtooth', 150, 5.5, 1.6, (o, g) => { o.frequency.exponentialRampToValueAtTime(1100, at(7.0)); env(g, 5.5, 1.4, 0.08, 0.1); });                          // riser
+  [523.25, 659.25, 783.99, 987.77, 1318.5].forEach((f, i) => { const s = T.logo + 0.06 * i; osc('triangle', f, s, 2.4, (o, g) => env(g, s, 0.01, 0.15, 2.0)); osc('sine', f * 2, s, 1.6, (o, g) => env(g, s, 0.01, 0.05, 1.2)); });   // logo chime
+  for (let i = 0; i < 5; i++) { const s = T.stars + i * 0.12; osc('sine', 1568 * (1 + 0.12 * i), s, 0.7, (o, g) => env(g, s, 0.005, 0.07, 0.5)); }                  // star plinks
+}
+
+// ------------------------------------------------------------ run loop and controls
+const qs = new URLSearchParams(location.search), embed = qs.has('embed'), frozen = qs.has('t') ? parseFloat(qs.get('t')) : null;
+let t0 = null, started = false, doneTimer = null;
+if (embed) document.body.classList.add('embed');
+const ui = document.getElementById('ui'), hint = document.getElementById('hint');
+function armAudio() {                                                   // browsers block sound until a gesture: start it in sync as soon as there is one
+  try { startAudio(0); } catch (e) { console.warn('audio unavailable', e); return; }
+  setTimeout(() => {
+    if (actx && actx.state === 'running') return;
+    hint.hidden = false;
+    const go = () => { ['pointerdown', 'keydown', 'touchstart'].forEach((ev) => removeEventListener(ev, go)); hint.hidden = true; try { startAudio(Math.max(0, (performance.now() - t0) / 1000)); } catch (e) { /* no audio */ } };
+    ['pointerdown', 'keydown', 'touchstart'].forEach((ev) => addEventListener(ev, go));
+  }, 250);
+}
+function begin() {
+  started = true; t0 = performance.now(); hint.hidden = true; ui.classList.add('hide'); setTimeout(() => ui.classList.remove('hide'), (T.end - 1) * 1000);
+  armAudio();
+  clearTimeout(doneTimer); if (embed) doneTimer = setTimeout(() => parent.postMessage({ type: 'wish-done' }, '*'), (T.end + 0.6) * 1000);
+}
+document.getElementById('replay').onclick = begin;
+document.getElementById('mute').onclick = (e) => { muted = !muted; e.target.textContent = muted ? 'Sound off' : 'Sound on'; e.target.setAttribute('aria-pressed', String(muted)); if (master) master.gain.value = muted ? 0 : 0.8; };
+addEventListener('message', (e) => { if (e.data && e.data.type === 'fade' && master) { master.gain.cancelScheduledValues(actx.currentTime); master.gain.setTargetAtTime(0, actx.currentTime, 0.25); } });
+function frame(now) {
+  requestAnimationFrame(frame);                                              // schedule first: one bad frame must not freeze the scene
+  const wall = now / 1000, t = frozen !== null ? frozen : started ? (now - t0) / 1000 : 0.4;
+  try { draw(Math.max(0, t), frozen !== null ? frozen : wall); } catch (e) { if (!frame.warned) { frame.warned = true; console.error('wish frame failed', e); } }
+}
+(document.fonts ? Promise.all([document.fonts.load('40px Polea'), document.fonts.load('20px Nebula')]) : Promise.resolve()).catch(() => {}).then(() => { requestAnimationFrame(frame); if (frozen === null) begin(); });
+window.__wish = { draw, T };
+})();
+</script>
+</body>
+</html>
