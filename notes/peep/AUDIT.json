@@ -1,0 +1,224 @@
+{
+ "app": "VisionSpacecraft",
+ "root": "/Users/hunter/Dev/VisionSpacecraft",
+ "generatedAt": "2026-10-11T20:57:27.403046",
+ "score": 49,
+ "items": [
+  {
+   "id": "idea",
+   "phase": "p1",
+   "weight": 2,
+   "status": "fail",
+   "evidence": "no notes/peep/IDEA.md",
+   "fix": "/peep"
+  },
+  {
+   "id": "builds",
+   "phase": "p1",
+   "weight": 5,
+   "status": "pass",
+   "evidence": "BUILD SUCCEEDED build/dd",
+   "fix": ""
+  },
+  {
+   "id": "core_loop",
+   "phase": "p1",
+   "weight": 4,
+   "status": "fail",
+   "evidence": "README.md names no core loop or first reward; no IDEA.md",
+   "fix": "/peep"
+  },
+  {
+   "id": "gitignore",
+   "phase": "e1",
+   "weight": 2,
+   "status": "pass",
+   "evidence": ".gitignore build, DerivedData",
+   "fix": ""
+  },
+  {
+   "id": "repo",
+   "phase": "e1",
+   "weight": 2,
+   "status": "pass",
+   "evidence": "origin present",
+   "fix": ""
+  },
+  {
+   "id": "optimize",
+   "phase": "e1",
+   "weight": 3,
+   "status": "fail",
+   "evidence": "no notes/vision-optimize-*.md",
+   "fix": "/vision-optimize"
+  },
+  {
+   "id": "warnings",
+   "phase": "e1",
+   "weight": 3,
+   "status": "pass",
+   "evidence": "0 warnings (incremental build)",
+   "fix": ""
+  },
+  {
+   "id": "no_todo",
+   "phase": "e1",
+   "weight": 2,
+   "status": "pass",
+   "evidence": "3 TODO/FIXME/HACK",
+   "fix": ""
+  },
+  {
+   "id": "design",
+   "phase": "e2",
+   "weight": 5,
+   "status": "fail",
+   "evidence": "no notes/design/BRAND.md, no Theme/ folder",
+   "fix": "/vision-design"
+  },
+  {
+   "id": "walkthrough",
+   "phase": "e2",
+   "weight": 6,
+   "status": "pass",
+   "evidence": "notes/walkthrough/PLAN.md, VisionSpacecraft/Walkthrough/",
+   "fix": ""
+  },
+  {
+   "id": "settings",
+   "phase": "e2",
+   "weight": 3,
+   "status": "pass",
+   "evidence": "VisionSpacecraft/Views/SettingsView.swift replay action",
+   "fix": ""
+  },
+  {
+   "id": "empty_states",
+   "phase": "e2",
+   "weight": 3,
+   "status": "fail",
+   "evidence": "no ContentUnavailableView or custom empty states",
+   "fix": "/vision-settings-polish"
+  },
+  {
+   "id": "haptics_audio",
+   "phase": "e2",
+   "weight": 3,
+   "status": "pass",
+   "evidence": "VisionSpacecraft/Audio/FlightAudio.swift (AVAudioEngine, pass/fail cues)",
+   "fix": ""
+  },
+  {
+   "id": "persistence",
+   "phase": "e2",
+   "weight": 3,
+   "status": "pass",
+   "evidence": "AppModel.swift Application Support save.json",
+   "fix": ""
+  },
+  {
+   "id": "accessibility",
+   "phase": "e2",
+   "weight": 4,
+   "status": "pass",
+   "evidence": "accessibilityLabel x6; reduce motion in SpatialIndicators.swift",
+   "fix": ""
+  },
+  {
+   "id": "privacy_strings",
+   "phase": "e2",
+   "weight": 3,
+   "status": "pass",
+   "evidence": "no hand/world/mic/camera capability used",
+   "fix": ""
+  },
+  {
+   "id": "permissions_flow",
+   "phase": "e2",
+   "weight": 2,
+   "status": "pass",
+   "evidence": "no permissions requested",
+   "fix": ""
+  },
+  {
+   "id": "performance",
+   "phase": "e2",
+   "weight": 3,
+   "status": "fail",
+   "evidence": "no vision-optimize notes",
+   "fix": "/vision-optimize"
+  },
+  {
+   "id": "icon",
+   "phase": "p2",
+   "weight": 5,
+   "status": "pass",
+   "evidence": "Assets.xcassets/AppIcon.solidimagestack",
+   "fix": ""
+  },
+  {
+   "id": "screenshots",
+   "phase": "p2",
+   "weight": 5,
+   "status": "fail",
+   "evidence": "no screenshots PNGs",
+   "fix": "/vision-screenshot"
+  },
+  {
+   "id": "asc",
+   "phase": "p2",
+   "weight": 6,
+   "status": "fail",
+   "evidence": "no ASC app for org.dicyaninlabs.visionspacecraft",
+   "fix": "/vision-asc-first-pass"
+  },
+  {
+   "id": "asc_metadata",
+   "phase": "p2",
+   "weight": 4,
+   "status": "fail",
+   "evidence": "no ASC app",
+   "fix": "/vision-asc-first-pass"
+  },
+  {
+   "id": "privacy_policy",
+   "phase": "p2",
+   "weight": 2,
+   "status": "fail",
+   "evidence": "no ASC app",
+   "fix": "/vision-asc-first-pass"
+  },
+  {
+   "id": "video",
+   "phase": "p2",
+   "weight": 4,
+   "status": "fail",
+   "evidence": "no demo video",
+   "fix": "/vision-record-demo"
+  },
+  {
+   "id": "testflight",
+   "phase": "p2",
+   "weight": 4,
+   "status": "fail",
+   "evidence": "no ASC app, no builds",
+   "fix": "/launch"
+  },
+  {
+   "id": "version",
+   "phase": "p2",
+   "weight": 2,
+   "status": "pass",
+   "evidence": "MARKETING_VERSION 0.1, build 1",
+   "fix": ""
+  },
+  {
+   "id": "review_notes",
+   "phase": "p2",
+   "weight": 2,
+   "status": "fail",
+   "evidence": "no ASC app",
+   "fix": "/vision-asc-first-pass"
+  }
+ ]
+}
