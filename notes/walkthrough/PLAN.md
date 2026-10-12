@@ -83,3 +83,16 @@ Each callout: small-caps title, one line, Learn more (one detail paragraph), ste
 ## Open items
 
 - No DicyaninStageDirector routes in this project yet, so step stills are not captured.
+
+## Course tips (M4 to M6)
+
+Shown once in the range, while idle, the first time a course with a new challenge opens. Persisted
+in `walkthrough.v1.tips`; replayed by Reset all in settings.
+
+| Tip | Course | Line |
+|---|---|---|
+| walls | C2B | Walls have one slot. The lidar finds it. |
+| aircraft | C4 | The aircraft starts in the air at 25 to 35 m/s. |
+| canyon | C5 | Stay between the canyon walls to the finish gate. |
+| debris | C6 | Rocks drift across the climb. Radar tracks them. |
+| capstone | C7 | This course is generated for this attempt. |

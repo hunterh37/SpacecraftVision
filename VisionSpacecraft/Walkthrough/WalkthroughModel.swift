@@ -37,7 +37,7 @@ struct WalkStep: Identifiable {
 
 /// Contextual tips shown once, the first time the feature is reachable.
 enum TipID: String, CaseIterable {
-    case hangar, code, failure, blocked
+    case hangar, code, failure, blocked, aircraft, walls, debris, canyon, capstone
 
     var title: String {
         switch self {
@@ -45,6 +45,11 @@ enum TipID: String, CaseIterable {
         case .code: "FLIGHT CODE"
         case .failure: "FAILED FLIGHT"
         case .blocked: "LAUNCH BLOCKED"
+        case .aircraft: "AIR START"
+        case .walls: "WALLS AHEAD"
+        case .debris: "MOVING DEBRIS"
+        case .canyon: "CANYON"
+        case .capstone: "NEW COURSE"
         }
     }
 
@@ -54,6 +59,11 @@ enum TipID: String, CaseIterable {
         case .code: "Edit update(dt). The range path re-predicts 0.3 s after each edit."
         case .failure: "The red sphere marks where it failed."
         case .blocked: "Launch blocked. Pinch Fix craft."
+        case .aircraft: "The aircraft starts in the air at 25 to 35 m/s."
+        case .walls: "Walls have one slot. The lidar finds it."
+        case .debris: "Rocks drift across the climb. Radar tracks them."
+        case .canyon: "Stay between the canyon walls to the finish gate."
+        case .capstone: "This course is generated for this attempt."
         }
     }
 
@@ -63,6 +73,11 @@ enum TipID: String, CaseIterable {
         case .code: "setup() runs once before launch. update(dt) runs 50 times a second. Compile errors show the line number in red."
         case .failure: "Plots show altitude and vertical speed against time. Earlier runs appear as ghosts so changes can be compared."
         case .blocked: "Fix craft restores the known-good build. Long-press it to open the hangar instead."
+        case .aircraft: "set_yaw is a heading rate flown as a banked turn, up to 45 degrees of bank. Below about 21 m/s the wing stalls."
+        case .walls: "craft.lidar(angle) returns the range along an angle from the heading, or -1 with no return within 120 m."
+        case .debris: "craft.radar_tracks() lists each moving rock as relative position, relative velocity and radius."
+        case .canyon: "craft.lidar_scan() returns 36 rays. Balloons swing across the canyon on a fixed period."
+        case .capstone: "Score is half energy against par and half time against par. Every run of this attempt uses the same course."
         }
     }
 }
@@ -288,6 +303,17 @@ final class WalkthroughModel {
         if !model.blockers.isEmpty && model.flight.phase == .idle { offer(.blocked) }
         else if model.lastReport?.result.passed == false && model.flight.phase == .finished { offer(.failure) }
         else if let t = rangeTip, t == .blocked, model.blockers.isEmpty { dismissTip() }
+        else if model.flight.phase == .idle, let t = Self.courseTip(model.mission) { offer(t) }
+    }
+
+    /// First-visit tip for a course with a new kind of challenge.
+    static func courseTip(_ m: Mission) -> TipID? {
+        if m.goal == .capstone { return .capstone }
+        if m.course.canyon != nil { return .canyon }
+        if m.isAircraft { return .aircraft }
+        if m.course.obstacles.contains(where: { $0.kind == .debris }) { return .debris }
+        if m.course.obstacles.contains(where: { $0.kind == .wall }) { return .walls }
+        return nil
     }
 
     private func offer(_ t: TipID) {
